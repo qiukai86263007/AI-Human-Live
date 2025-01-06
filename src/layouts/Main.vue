@@ -47,7 +47,7 @@ onMounted(() => {
         </div>
         <div class="window-body">
             <div class="page-container flex">
-                <div class="w-16 flex-shrink-0 h-full text-white"
+                <div class="w-24 flex-shrink-0 h-full text-white"
                      style="background-color:var(--color-bg-page-nav);">
                     <PageNav/>
                 </div>

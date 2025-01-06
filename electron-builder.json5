@@ -57,7 +57,7 @@
         "requestExecutionLevel": "user"
     },
     "appx": {
-        "identityName": "AigcPanel",
+        "identityName": "AI数字人直播系统",
         "publisher": "CN=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXX",
         "publisherDisplayName": "AigcPanel",
         "languages": [

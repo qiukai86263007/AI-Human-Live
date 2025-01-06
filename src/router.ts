@@ -9,9 +9,10 @@ const routes = [
             {path: '', component: () => import('./pages/Home.vue')},
             {path: 'home', component: () => import('./pages/Home.vue')},
             {path: 'server', component: () => import('./pages/Server.vue')},
-            // {path: 'sound', component: () => import('./pages/Sound.vue')},
-            {path: 'video', component: () => import('./pages/Video.vue')},
+            {path: 'sound', component: () => import('./pages/SoundClone.vue')},
+            {path: 'live', component: () => import('./pages/DigtalHumanLive.vue')},
             {path: 'setting', component: () => import('./pages/Setting.vue')},
+            {path: 'video', component: () => import('./pages/Video.vue')},
         ]
     },
     {

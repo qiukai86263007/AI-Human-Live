@@ -11,7 +11,7 @@ onMounted(async () => {
 
 
 onBeforeMount(() => {
-    Router.push('/video')
+    Router.push('/live')
 })
 
 </script>

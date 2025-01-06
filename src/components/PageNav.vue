@@ -16,12 +16,14 @@ const activeTab = computed(() => {
             return 'home'
         case '/server':
             return 'server'
-        // case '/sound':
-        //     return 'sound'
+        case '/sound':
+            return 'sound'
         case '/setting':
             return 'setting'
         case '/video':
             return 'video'
+        case '/live':
+            return 'live'
     }
 })
 
@@ -59,23 +61,23 @@ const doUser = async () => {
         </div>
         <div class="flex-grow mt-2">
             <a class="page-nav-item block text-center py-3"
-               :class="activeTab==='video'?'active':''"
-               @click="$router.push('/video')"
+               :class="activeTab==='live'?'active':''"
+               @click="$router.push('/live')"
                href="javascript:;">
                 <div>
                     <i class="iconfont icon-human text-xl"></i>
                 </div>
-                <div class="text-sm">{{ $t('数字人') }}</div>
+                <div class="text-sm">{{ $t('数字人直播') }}</div>
             </a>
-<!--            <a class="page-nav-item block text-center py-3"-->
-<!--               :class="activeTab==='sound'?'active':''"-->
-<!--               @click="$router.push('/sound')"-->
-<!--               href="javascript:;">-->
-<!--                <div>-->
-<!--                    <icon-sound class="text-xl"/>-->
-<!--                </div>-->
-<!--                <div class="text-sm">{{ $t('声音') }}</div>-->
-<!--            </a>-->
+            <a class="page-nav-item block text-center py-3"
+               :class="activeTab==='sound'?'active':''"
+               @click="$router.push('/sound')"
+               href="javascript:;">
+                <div>
+                    <icon-sound class="text-xl"/>
+                </div>
+                <div class="text-sm">{{ $t('声音克隆') }}</div>
+            </a>
             <a class="page-nav-item block text-center py-3"
                :class="activeTab==='server'?'active':''"
                @click="$router.push('/server')"
