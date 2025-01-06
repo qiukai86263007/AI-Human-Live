@@ -55,7 +55,7 @@
 
 ### Windows
 
-- 访问 [https://aigcpanel.com](https://aigcpanel.com) 下载 Windows 安装包，一键安装即可
+- 访问 [https://aigcpanel.com](https://aigcpanel.com) 下载 Windows 安装包，一键安装即可。
 
 安装完成后，打开软件，下载模型一键启动包，即可使用。
 
