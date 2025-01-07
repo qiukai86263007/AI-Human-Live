@@ -5,7 +5,7 @@
     :footer="false"
     :mask-closable="false"
     :closable="true"
-    :width="800"
+    :width="1200"
     :draggable="true"
     :align-center="false"
     modal-class="platform-settings-modal"
@@ -14,11 +14,11 @@
   >
     <div class="flex h-[600px]">
       <!-- 左侧选项卡 -->
-      <div class="w-32 border-r border-gray-200">
+      <div class="w-40 border-r border-gray-200">
         <div
           v-for="tab in tabs"
           :key="tab.key"
-          class="py-3 px-4 cursor-pointer"
+          class="py-3 px-6 cursor-pointer"
           :class="currentTab === tab.key ? 'bg-blue-50 text-blue-500' : 'text-gray-500 hover:bg-gray-50'"
           @click="currentTab = tab.key"
         >
@@ -94,12 +94,238 @@
         
         <!-- 定时引导面板 -->
         <div v-else-if="currentTab === 'timing'" class="h-full">
-          <!-- 定时引导内容 -->
+          <div class="flex flex-col h-full">
+            <!-- 上部分：左右两个面板 -->
+            <div class="flex gap-4 flex-grow">
+              <!-- 左侧设置区域 -->
+              <div class="w-[400px] flex-shrink-0">
+                <div class="mb-4 text-lg font-medium">定时引导互动设置</div>
+                <!-- 引导内容类型选择 -->
+                <div class="mb-4">
+                  <div class="mb-2">引导方式</div>
+                  <a-radio-group>
+                    <a-radio value="danmu">弹幕</a-radio>
+                    <a-radio value="assistant">助播</a-radio>
+                    <a-radio value="both">弹幕和助播</a-radio>
+                  </a-radio-group>
+                </div>
+                
+                <!-- 引导间隔设置 -->
+                <div class="mb-4">
+                  <div class="mb-2">引导间隔</div>
+                  <div class="flex items-center gap-2">
+                    <a-input-number
+                      :min="0"
+                      :max="100"
+                      class="w-24"
+                      :default-value="60"
+                    />
+                    <span>秒</span>
+                  </div>
+                </div>
+                
+                <!-- 引导概率设置组 -->
+                <div class="mb-4">
+                  <div class="mb-2">引导概率</div>
+                  <div class="space-y-3">
+                    <!-- 综合引导概率 -->
+                    <div class="flex items-center gap-2">
+                      <span class="w-24">综合引导：</span>
+                      <a-input-number
+                        v-model="timingSettings.probabilities.comprehensive"
+                        :min="0"
+                        :max="100"
+                        class="w-20"
+                      />
+                      <span>%</span>
+                    </div>
+                    <!-- 关注引导概率 -->
+                    <div class="flex items-center gap-2">
+                      <span class="w-24">关注引导：</span>
+                      <a-input-number
+                        v-model="timingSettings.probabilities.follow"
+                        :min="0"
+                        :max="100"
+                        class="w-20"
+                      />
+                      <span>%</span>
+                    </div>
+                    <!-- 消费引导概率 -->
+                    <div class="flex items-center gap-2">
+                      <span class="w-24">消费引导：</span>
+                      <a-input-number
+                        v-model="timingSettings.probabilities.consume"
+                        :min="0"
+                        :max="100"
+                        class="w-20"
+                      />
+                      <span>%</span>
+                    </div>
+                    <!-- 分享引导概率 -->
+                    <div class="flex items-center gap-2">
+                      <span class="w-24">分享引导：</span>
+                      <a-input-number
+                        v-model="timingSettings.probabilities.share"
+                        :min="0"
+                        :max="100"
+                        class="w-20"
+                      />
+                      <span>%</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- 引导发送方式 -->
+                <div class="mb-4">
+                  <div class="mb-2">发送方式</div>
+                  <a-radio-group>
+                    <a-radio>顺序发送</a-radio>
+                    <a-radio>随机发送</a-radio>
+                  </a-radio-group>
+                </div>
+              </div>
+              
+              <!-- 右侧内容区域 -->
+              <div class="flex-grow">
+                <div class="mb-4 text-lg font-medium">引导内容设置</div>
+                <!-- 引导类型选项卡 -->
+                <a-tabs v-model:activeKey="currentGuideType" @change="handleTabChange">
+                  <a-tab-pane key="综合引导" title="综合引导" />
+                  <a-tab-pane key="关注引导" title="关注引导" />
+                  <a-tab-pane key="消费引导" title="消费引导" />
+                  <a-tab-pane key="分享引导" title="分享引导" />
+                </a-tabs>
+                
+                <!-- 引导内容列表 -->
+                <div>
+                  <div class="flex mb-4">
+                    <a-button type="primary">
+                      <template #icon>
+                        <icon-plus />
+                      </template>
+                      添加引导
+                    </a-button>
+                  </div>
+                  <div class="bg-[#1D1E2B] rounded-lg p-4 h-[400px] overflow-y-auto">
+                    <template v-if="getGuideList(currentGuideType).length">
+                      <div v-for="guide in getGuideList(currentGuideType)" 
+                           :key="guide.id"
+                           class="bg-[#252632] rounded-lg p-4 mb-3 last:mb-0"
+                      >
+                        <div class="flex items-center justify-between">
+                          <div class="text-white">{{ guide.content }}</div>
+                          <div class="flex items-center gap-2">
+                            <a-button type="text" size="mini">
+                              <template #icon>
+                                <icon-edit />
+                              </template>
+                            </a-button>
+                            <a-button type="text" size="mini" status="danger">
+                              <template #icon>
+                                <icon-delete />
+                              </template>
+                            </a-button>
+                          </div>
+                        </div>
+                      </div>
+                    </template>
+                    <template v-else>
+                      <div class="text-gray-400 text-center py-20">
+                        暂无引导内容
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 底部面板 -->
+            <div class="flex justify-end items-center h-16 mt-4 pt-4 border-t border-gray-200">
+              <a-button type="primary">
+                保存当前设置
+              </a-button>
+            </div>
+          </div>
         </div>
         
         <!-- 人气互动面板 -->
         <div v-else-if="currentTab === 'popularity'" class="h-full">
-          <!-- 人气互动内容 -->
+          <div class="flex flex-col h-full">
+            <!-- 上部分：左右两个面板 -->
+            <div class="flex gap-4 flex-grow">
+              <!-- 左侧设置区域 -->
+              <div class="w-[400px] flex-shrink-0">
+                <div class="mb-4 text-lg font-medium">新增点赞互动设置</div>
+                <!-- 互动方式 -->
+                <div class="mb-4">
+                  <div class="mb-2">互动方式</div>
+                  <a-radio-group v-model="popularitySettings.replyMode">
+                    <a-radio value="danmu">弹幕</a-radio>
+                    <a-radio value="assistant">助播</a-radio>
+                    <a-radio value="both">弹幕和助播</a-radio>
+                  </a-radio-group>
+                </div>
+                
+                <!-- 新增点赞触发条件 -->
+                <div class="mb-4">
+                  <div class="flex items-center gap-2">
+                    <a-input-number
+                      v-model="popularitySettings.triggerCount"
+                      :min="0"
+                      class="w-24"
+                      :default-value="10"
+                    />
+                    <span>时，互动内容</span>
+                  </div>
+                </div>
+                
+                <!-- 文本和语音切换 -->
+                <div class="mb-4">
+                  <a-radio-group v-model="popularitySettings.contentType">
+                    <a-radio value="text">文本内容</a-radio>
+                    <a-radio value="voice">语音内容</a-radio>
+                  </a-radio-group>
+                </div>
+                
+                <!-- 内容输入框 -->
+                <div class="mb-4">
+                  <a-textarea
+                    v-model="popularitySettings.content"
+                    placeholder="大家可以点个小车车，我来唱歌啦"
+                    :auto-size="{ minRows: 3, maxRows: 5 }"
+                    class="bg-[#1D1E2B] text-white border-none"
+                  />
+                </div>
+              </div>
+              
+              <!-- 右侧内容区域 -->
+              <div class="flex-grow">
+                <div class="mb-4 text-lg font-medium">在线人数互动设置</div>
+                <!-- 添加条件按钮 -->
+                <div class="flex mb-4">
+                  <a-button type="primary">
+                    <template #icon>
+                      <icon-plus />
+                    </template>
+                    添加条件
+                  </a-button>
+                </div>
+                <!-- 内容列表 -->
+                <div class="bg-[#1D1E2B] rounded-lg p-4 h-[400px] overflow-y-auto">
+                  <div class="text-gray-400 text-center py-20">
+                    暂无互动内容
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 底部面板 -->
+            <div class="flex justify-end items-center h-16 mt-4 pt-4 border-t border-gray-200">
+              <a-button type="primary">
+                保存当前设置
+              </a-button>
+            </div>
+          </div>
         </div>
         
         <!-- 礼物感谢面板 -->
@@ -196,6 +422,54 @@ const priorityItems = [
   { key: 'gift', label: '礼物感谢' },
   { key: 'popularity', label: '人气互动' },
 ];
+
+// 定时引导设置
+const timingSettings = reactive({
+  type: 'comprehensive', // 引导类型
+  replyMode: 'danmu',   // 回复方式：弹幕/助播/both
+  interval: 60,         // 引导间隔
+  probabilities: {      // 各类型引导概率
+    comprehensive: 25,  // 综合引导概率
+    follow: 25,        // 关注引导概率
+    consume: 25,       // 消费引导概率
+    share: 25          // 分享引导概率
+  },
+  sendMode: 'sequence'  // 发送方式
+});
+
+// 当前选中的引导类型
+const currentGuideType = ref('综合引导');
+
+// 引导内容列表
+const guideList = reactive({
+  '综合引导': [
+    { id: 1, content: '这是一条综合引导内容' },
+    { id: 2, content: '这是另一条综合引导内容' }
+  ],
+  '关注引导': [
+    { id: 3, content: '这是一条关注引导内容' }
+  ],
+  '消费引导': [],
+  '分享引导': []
+});
+
+// 获取当前类型的引导列表
+const getGuideList = (type: string) => {
+  return guideList[type] || [];
+};
+
+// 监听选项卡变化
+const handleTabChange = (key: string) => {
+  currentGuideType.value = key;
+};
+
+// 人气互动设置
+const popularitySettings = reactive({
+  replyMode: 'danmu',      // 互动方式
+  triggerCount: 10,        // 触发数量
+  contentType: 'text',     // 内容类型
+  content: '',             // 互动内容
+});
 </script>
 
 <style scoped>
