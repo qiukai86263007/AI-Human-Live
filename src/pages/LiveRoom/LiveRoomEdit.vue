@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
+import PlatformSelector from './PlatformSelector.vue';
 
 const router = useRouter();
 const currentTab = ref('主播选择');
@@ -17,6 +18,7 @@ const scriptSearchText = ref('');
 const questionSearchText = ref('');
 const replyDelay = ref(60);
 const replyMode = ref('1');
+const showPlatformDialog = ref(false);
 
 const tabs = [
   { key: '主播选择', icon: 'icon-user' },
@@ -237,6 +239,12 @@ const saveCategory = () => {
   editingCategory.value = { id: 0, name: '', qas: [] };
 };
 
+// 处理平台选择
+const handlePlatformSelect = (platform: any) => {
+  console.log('Selected platform:', platform);
+  showPlatformDialog.value = false;
+};
+
 </script>
 
 <template>
@@ -267,7 +275,11 @@ const saveCategory = () => {
         </div>
       </div>
       <div class="flex-shrink-0">
-        <a-button type="outline" status="success">
+        <a-button 
+          type="outline" 
+          status="success"
+          @click="showPlatformDialog = true"
+        >
           <template #icon>
             <icon-robot />
           </template>
@@ -716,6 +728,12 @@ const saveCategory = () => {
       placeholder="请输入问题种类名称"
     />
   </a-modal>
+
+  <!-- 平台选择对话框 -->
+  <PlatformSelector
+    v-model:visible="showPlatformDialog"
+    @select="handlePlatformSelect"
+  />
 </template>
 
 <style scoped>
