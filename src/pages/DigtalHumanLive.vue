@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { Input, Select, DatePicker, Button, Card } from '@arco-design/web-vue';
+import CreateLiveRoomDialog from '../components/Live/CreateLiveRoomDialog.vue';
 
 const searchText = ref('');
 const selectedType = ref('全部');
@@ -74,6 +75,12 @@ const refreshData = async () => {
   }
 };
 
+const createLiveRoomDialog = ref();
+
+const handleCreateRoom = () => {
+  createLiveRoomDialog.value?.show();
+};
+
 </script>
 
 <template>
@@ -118,7 +125,7 @@ const refreshData = async () => {
 
     <!-- 创建直播间按钮 -->
     <div class="flex justify-between items-center mb-6">
-      <a-button type="primary" size="large">
+      <a-button type="primary" size="large" @click="handleCreateRoom">
         <template #icon>
           <icon-plus />
         </template>
@@ -169,6 +176,7 @@ const refreshData = async () => {
       </a-card>
     </div>
   </div>
+  <CreateLiveRoomDialog ref="createLiveRoomDialog" />
 </template>
 
 <style scoped>

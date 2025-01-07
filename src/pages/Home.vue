@@ -17,13 +17,16 @@ onBeforeMount(() => {
 </script>
 
 <template>
-    <div class="page-narrow-container p-8">
-        <div class="text-3xl font-bold mb-4">
-            欢迎使用 {{ AppConfig.name }} ！
-        </div>
-        <div>
-
-        </div>
+    <div class="app-container scale-110">
+        <router-view></router-view>
     </div>
 </template>
+
+<style scoped>
+.app-container {
+    height: 100vh;
+    width: 100vw;
+    transform-origin: top left;
+}
+</style>
 

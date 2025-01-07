@@ -13,6 +13,10 @@ const routes = [
             {path: 'live', component: () => import('./pages/DigtalHumanLive.vue')},
             {path: 'setting', component: () => import('./pages/Setting.vue')},
             {path: 'video', component: () => import('./pages/Video.vue')},
+            {
+                path: 'live-room/edit',
+                component: () => import('./pages/LiveRoom/LiveRoomEdit.vue')
+            }
         ]
     },
     {
