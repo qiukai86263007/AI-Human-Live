@@ -30,7 +30,66 @@
       <div class="flex-1 p-4">
         <!-- 全局设置面板 -->
         <div v-if="currentTab === 'global'" class="h-full">
-          <!-- 全局设置内容 -->
+          <div class="flex flex-col h-full">
+            <div class="space-y-6 flex-grow">
+              <!-- 运行模式 -->
+              <div>
+                <div class="mb-2">运行模式</div>
+                <div class="flex items-center gap-4">
+                  <a-radio-group v-model="settings.runMode">
+                    <a-radio value="smart">智能弹夹</a-radio>
+                    <a-radio value="practice">实时弹夹</a-radio>
+                  </a-radio-group>
+                </div>
+
+              </div>
+              
+              <!-- 发送间隔 -->
+              <div>
+                <div class="mb-2">发送间隔</div>
+                <div class="flex items-center gap-2">
+                  <a-input-number
+                    v-model="settings.replyDelay"
+                    :min="0"
+                    :max="100"
+                    class="w-24"
+                  />
+                  <span>秒内一次关键词不重复回复</span>
+                </div>
+              </div>
+              
+              <!-- 优先级设置 -->
+              <div>
+                <div class="mb-2">优先级设置</div>
+                <div class="flex flex-wrap gap-4">
+                  <div v-for="item in priorityItems" 
+                       :key="item.key" 
+                       class="flex items-center gap-2 whitespace-nowrap"
+                  >
+                    <a-input-number
+                      v-model="settings.priorities[item.key]"
+                      :min="0"
+                      :max="10"
+                      :precision="0"
+                      class="w-16"
+                      size="small"
+                    />
+                    <span>{{ item.label }}</span>
+                  </div>
+                </div>
+                <div class="text-gray-400 text-sm mt-1">
+                  数字越大优先级越高，仅针对智能模式生效
+                </div>
+              </div>
+            </div>
+            
+            <!-- 底部保存按钮 -->
+            <div class="flex justify-end mt-6 pt-4 border-t">
+              <a-button type="primary" @click="handleSave">
+                保存当前设置
+              </a-button>
+            </div>
+          </div>
         </div>
         
         <!-- 定时引导面板 -->
@@ -53,7 +112,32 @@
 </template>
 
 <script setup lang="ts">
-import { defineProps, defineEmits, computed, ref } from 'vue';
+import { defineProps, defineEmits, computed, ref, reactive } from 'vue';
+
+interface Settings {
+  runMode: 'smart' | 'practice';
+  replyDelay: number;
+  priorities: {
+    productQA: number;
+    activity: number;
+    welcome: number;
+    gift: number;
+    popularity: number;
+  };
+}
+
+// 设置数据
+const settings = reactive<Settings>({
+  runMode: 'smart',
+  replyDelay: 10,
+  priorities: {
+    productQA: 4,
+    activity: 3,
+    welcome: 2,
+    gift: 1,
+    popularity: 0
+  }
+});
 
 // 选项卡配置
 const tabs = [
@@ -95,6 +179,23 @@ const handleClose = (e: Event) => {
   emit('close');
   emit('update:visible', false);
 };
+
+// 处理保存
+const handleSave = () => {
+  // TODO: 实际保存逻辑
+  console.log('保存设置:', settings);
+  // 可以添加保存成功提示
+  Message.success('设置已保存');
+};
+
+// 优先级配置
+const priorityItems = [
+  { key: 'productQA', label: '产品问答' },
+  { key: 'activity', label: '活动引导' },
+  { key: 'welcome', label: '欢迎' },
+  { key: 'gift', label: '礼物感谢' },
+  { key: 'popularity', label: '人气互动' },
+];
 </script>
 
 <style scoped>
