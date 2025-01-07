@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import PlatformSelector from './PlatformSelector.vue';
+import PlatformSettings from './PlatformSettings.vue';
 
 const router = useRouter();
 const currentTab = ref('主播选择');
@@ -19,6 +20,8 @@ const questionSearchText = ref('');
 const replyDelay = ref(60);
 const replyMode = ref('1');
 const showPlatformDialog = ref(false);
+const showPlatformSettings = ref(false);
+const selectedPlatform = ref('');
 
 const tabs = [
   { key: '主播选择', icon: 'icon-user' },
@@ -241,8 +244,15 @@ const saveCategory = () => {
 
 // 处理平台选择
 const handlePlatformSelect = (platform: any) => {
-  console.log('Selected platform:', platform);
+  selectedPlatform.value = platform.name;
   showPlatformDialog.value = false;
+  showPlatformSettings.value = true;
+};
+
+// 处理设置返回
+const handleSettingsBack = () => {
+  showPlatformSettings.value = false;
+  showPlatformDialog.value = true;
 };
 
 </script>
@@ -733,6 +743,14 @@ const handlePlatformSelect = (platform: any) => {
   <PlatformSelector
     v-model:visible="showPlatformDialog"
     @select="handlePlatformSelect"
+  />
+
+  <!-- 平台设置对话框 -->
+  <PlatformSettings
+    v-model:visible="showPlatformSettings"
+    :platform="selectedPlatform"
+    @back="handleSettingsBack"
+    @close="showPlatformSettings = false"
   />
 </template>
 
