@@ -258,51 +258,75 @@
                 <div class="mb-4 text-lg font-medium">新增点赞互动设置</div>
                 <!-- 互动方式 -->
                 <div class="mb-4">
-                  <div class="mb-2">互动方式</div>
+                  <div class="mb-2">新增点赞互动方式</div>
                   <a-radio-group v-model="popularitySettings.replyMode">
                     <a-radio value="danmu">弹幕</a-radio>
-                    <a-radio value="assistant">助播</a-radio>
+                    <a-radio value="host">主播</a-radio>
                     <a-radio value="both">弹幕和助播</a-radio>
                   </a-radio-group>
                 </div>
-                
                 <!-- 新增点赞触发条件 -->
-                <div class="mb-4">
-                  <div class="flex items-center gap-2">
-                    <a-input-number
-                      v-model="popularitySettings.triggerCount"
-                      :min="0"
-                      class="w-24"
-                      :default-value="10"
-                    />
-                    <span>时，互动内容</span>
+                <div>
+                  <div class="flex items-center justify-between mb-2">
+                    <span>新增点赞触发条件</span>
+                    <a-button type="primary" size="small">
+                      <template #icon>
+                        <icon-plus />
+                      </template>
+                      添加条件
+                    </a-button>
                   </div>
-                </div>
-                
-                <!-- 文本和语音切换 -->
-                <div class="mb-4">
-                  <a-radio-group v-model="popularitySettings.contentType">
-                    <a-radio value="text">文本内容</a-radio>
-                    <a-radio value="voice">语音内容</a-radio>
-                  </a-radio-group>
-                </div>
-                
-                <!-- 内容输入框 -->
-                <div class="mb-4">
-                  <a-textarea
-                    v-model="popularitySettings.content"
-                    placeholder="大家可以点个小车车，我来唱歌啦"
-                    :auto-size="{ minRows: 3, maxRows: 5 }"
-                    class="bg-[#1D1E2B] text-white border-none"
-                  />
+                  <!-- 触发规则列表 -->
+                  <div class="bg-[#1D1E2B] rounded-lg p-4 h-[400px] overflow-y-auto">
+                    <template v-if="popularitySettings.likeRules.length">
+                      <div v-for="rule in popularitySettings.likeRules" 
+                           :key="rule.id"
+                           class="bg-[#252632] rounded-lg p-4 mb-3 last:mb-0"
+                      >
+                        <div class="flex items-center justify-between">
+                          <div class="text-white">
+                            {{ rule.count }} 时，互动内容
+                          </div>
+                          <div class="flex items-center gap-2">
+                            <a-button type="text" size="mini">
+                              <template #icon>
+                                <icon-edit />
+                              </template>
+                            </a-button>
+                            <a-button type="text" size="mini" status="danger">
+                              <template #icon>
+                                <icon-delete />
+                              </template>
+                            </a-button>
+                          </div>
+                        </div>
+                      </div>
+                    </template>
+                    <template v-else>
+                      <div class="text-gray-400 text-center py-20">
+                        暂无触发规则
+                      </div>
+                    </template>
+                  </div>
                 </div>
               </div>
               
               <!-- 右侧内容区域 -->
               <div class="flex-grow">
                 <div class="mb-4 text-lg font-medium">在线人数互动设置</div>
+                <!-- 互动方式 -->
+                <div class="mb-4">
+                  <div class="mb-2">新增在线人数互动方式</div>
+                  <a-radio-group v-model="popularitySettings.onlineReplyMode">
+                    <a-radio value="danmu">弹幕</a-radio>
+                    <a-radio value="assistant">助播</a-radio>
+                    <a-radio value="both">弹幕和助播</a-radio>
+                  </a-radio-group>
+                </div>
+                
                 <!-- 添加条件按钮 -->
-                <div class="flex mb-4">
+                <div class="flex items-center justify-between mb-4">
+                  <span>在线人数触发条件</span>
                   <a-button type="primary">
                     <template #icon>
                       <icon-plus />
@@ -465,10 +489,12 @@ const handleTabChange = (key: string) => {
 
 // 人气互动设置
 const popularitySettings = reactive({
-  replyMode: 'danmu',      // 互动方式
-  triggerCount: 10,        // 触发数量
-  contentType: 'text',     // 内容类型
-  content: '',             // 互动内容
+  replyMode: 'danmu',      // 点赞互动方式
+  onlineReplyMode: 'danmu', // 在线人数互动方式
+  likeRules: [             // 点赞触发规则列表
+    { id: 1, count: 10 },
+    { id: 2, count: 50 }
+  ]
 });
 </script>
 
