@@ -147,6 +147,9 @@ const handleRoomClick = (room: LiveBroadcastRecord) => {
       <div class="flex-grow"></div>
       
       <a-button type="primary" @click="handleCreate">
+        <template #icon>
+          <icon-plus />
+        </template>
         新建直播间
       </a-button>
     </div>

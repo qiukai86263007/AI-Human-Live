@@ -1,15 +1,19 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, computed, onMounted } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
+import { Message } from '@arco-design/web-vue';
 import PlatformSelector from './PlatformSelector.vue';
 import PlatformSettings from './PlatformSettings.vue';
+import LiveBroadcastService, { LiveBroadcastRecord } from '../../service/LiveBroadcastService';
+import LiveProductService, { LiveProductRecord } from '../../service/LiveProductService';
 
 const router = useRouter();
+const route = useRoute();
 const currentTab = ref('主播选择');
 const currentPage = ref(1);
 const pageSize = 4; // 每页显示4个主播
 const isEditing = ref(false);
-const roomName = ref(router.currentRoute.value.query.name?.toString() || '未命名直播间');
+const roomName = ref('');
 const searchText = ref('');
 const manualText = ref('');
 const aiKeyword = ref('');
@@ -22,6 +26,7 @@ const replyMode = ref('1');
 const showPlatformDialog = ref(false);
 const showPlatformSettings = ref(false);
 const selectedPlatform = ref('');
+const liveRoom = ref<LiveBroadcastRecord | null>(null);
 
 const tabs = [
   { key: '主播选择', icon: 'icon-user' },
@@ -56,9 +61,19 @@ const currentAnchors = computed(() => {
   return filteredAnchors.value.slice(start, start + pageSize);
 });
 
-const toggleEdit = () => {
+const toggleEdit = async () => {
   if (isEditing.value) {
     // 保存逻辑
+    if (liveRoom.value?.id) {
+      try {
+        await LiveBroadcastService.update(liveRoom.value.id, {
+          live_name: roomName.value,
+          updater: 'current_user'  // 这里需要替换为实际的用户ID
+        });
+      } catch (error) {
+        console.error('保存直播间名称失败:', error);
+      }
+    }
     isEditing.value = false;
   } else {
     isEditing.value = true;
@@ -271,102 +286,8 @@ const handleSettingsBack = () => {
   showPlatformDialog.value = true;
 };
 
-// 产品列表数据
-const productList = ref<Array<{ id: number; name: string }>>([]);
-const currentProduct = ref<{ id: number; name: string } | null>(null);
-// 选择模式
-const isMultiSelect = ref(false);
-// 选中的产品ID列表
-const selectedProducts = ref<number[]>([]);
-// 是否全选
-const isAllSelected = computed(() => {
-  return productList.value.length > 0 && selectedProducts.value.length === productList.value.length;
-});
-
-// 处理新建产品
-const handleCreateProduct = () => {
-  const newProduct: Product = {
-    id: Date.now(),
-    name: `产品${productList.value.length + 1}`,
-    currentTab: '主播选择',
-    selectedAnchors: [],
-    scripts: [],
-    questionCategories: []
-  };
-  productList.value.push(newProduct);
-  currentProduct.value = newProduct;
-  currentTab.value = newProduct.currentTab;
-};
-
-// 处理选择产品
-const handleSelectProduct = (product: Product) => {
-  if (isMultiSelect.value) {
-    // 多选模式：切换选中状态
-    const index = selectedProducts.value.indexOf(product.id);
-    if (index > -1) {
-      selectedProducts.value.splice(index, 1);
-    } else {
-      selectedProducts.value.push(product.id);
-    }
-  } else {
-    // 单选模式：切换到产品对应的选项卡
-    currentProduct.value = product;
-    selectedProducts.value = [product.id];
-    currentTab.value = product.currentTab;
-  }
-};
-
-// 处理全选
-const handleSelectAll = (checked: boolean) => {
-  if (checked) {
-    selectedProducts.value = productList.value.map(product => product.id);
-  } else {
-    selectedProducts.value = [];
-  }
-};
-
-// 处理多选切换
-const handleMultiSelect = (checked: boolean) => {
-  isMultiSelect.value = checked;
-  if (!checked) {
-    // 退出多选模式时，清空选择
-    selectedProducts.value = [];
-  }
-};
-
-// 处理删除
-const handleDelete = () => {
-  if (selectedProducts.value.length === 0) return;
-  
-  // 过滤掉选中的产品
-  productList.value = productList.value.filter(
-    product => !selectedProducts.value.includes(product.id)
-  );
-  
-  // 清空选择
-  selectedProducts.value = [];
-  
-  // 如果当前选中的产品被删除，清空currentProduct
-  if (currentProduct.value && selectedProducts.value.includes(currentProduct.value.id)) {
-    currentProduct.value = null;
-  }
-};
-
-// 添加选项卡切换处理函数
-const handleTabChange = (tab: string) => {
-  if (!currentProduct.value) {
-    Message.warning('请先选择产品');
-    return;
-  }
-  currentTab.value = tab;
-  currentProduct.value.currentTab = tab;
-};
-
-interface Product {
-  id: number;
-  name: string;
-  currentTab: string;
-  selectedAnchors: number[];
+interface ProductExtend extends LiveProductRecord {
+  currentTab?: string;
   scripts: Array<{
     id: number;
     content: string;
@@ -382,6 +303,146 @@ interface Product {
     }>;
   }>;
 }
+
+// 产品列表数据
+const productList = ref<LiveProductRecord[]>([]);
+const currentProduct = ref<ProductExtend | null>(null);
+// 选择模式
+const isMultiSelect = ref(false);
+// 选中的产品ID列表
+const selectedProducts = ref<string[]>([]);
+// 是否全选
+const isAllSelected = computed(() => {
+  return productList.value.length > 0 && selectedProducts.value.length === productList.value.length;
+});
+
+// 加载产品列表
+const loadProducts = async () => {
+  const id = route.query.id as string;
+  if (!id) return;
+  
+  try {
+    productList.value = await LiveProductService.listByLiveId(id);
+  } catch (error) {
+    console.error('加载产品列表失败:', error);
+  }
+};
+
+// 处理新建产品
+const handleCreateProduct = async () => {
+  const liveId = route.query.id as string;
+  if (!liveId) return;
+
+  try {
+    await LiveProductService.create({
+      live_id: liveId,
+      product_id: `product_${Date.now()}`,
+      ording: productList.value.length,
+      state: 'active',
+      creator: 'current_user',
+      updater: 'current_user',
+      script_index: 0
+    });
+
+    await loadProducts();
+    Message.success('创建成功');
+  } catch (error) {
+    console.error('创建产品失败:', error);
+    Message.error('创建失败');
+  }
+};
+
+// 处理选择产品
+const handleSelectProduct = (product: LiveProductRecord) => {
+  if (isMultiSelect.value) {
+    // 多选模式：切换选中状态
+    const index = selectedProducts.value.indexOf(product.id);
+    if (index > -1) {
+      selectedProducts.value.splice(index, 1);
+    } else {
+      selectedProducts.value.push(product.id);
+    }
+  } else {
+    // 单选模式：切换到产品对应的选项卡
+    const extendedProduct: ProductExtend = {
+      ...product,
+      scripts: [],
+      questionCategories: []
+    };
+    currentProduct.value = extendedProduct;
+    selectedProducts.value = [product.id];
+    currentTab.value = '主播选择';
+  }
+};
+
+// 处理全选
+const handleSelectAll = (checked: boolean) => {
+  if (checked) {
+    selectedProducts.value = productList.value.map(product => product.id!).filter(Boolean);
+  } else {
+    selectedProducts.value = [];
+  }
+};
+
+// 处理多选切换
+const handleMultiSelect = (checked: boolean) => {
+  isMultiSelect.value = checked;
+  if (!checked) {
+    // 退出多选模式时，清空选择
+    selectedProducts.value = [];
+  }
+};
+
+// 处理删除
+const handleDelete = async () => {
+  if (selectedProducts.value.length === 0) return;
+  
+  try {
+    // 如果当前选中的产品被删除，清空currentProduct
+    if (currentProduct.value && selectedProducts.value.includes(currentProduct.value.id!)) {
+      currentProduct.value = null;
+    }
+
+    await LiveProductService.batchDelete(selectedProducts.value);
+    await loadProducts();
+    selectedProducts.value = [];
+    Message.success('删除成功');
+  } catch (error) {
+    console.error('删除产品失败:', error);
+    Message.error('删除失败');
+  }
+};
+
+// 添加选项卡切换处理函数
+const handleTabChange = (tab: string) => {
+  if (!currentProduct.value) {
+    Message.warning('请先选择产品');
+    return;
+  }
+  currentTab.value = tab;
+  currentProduct.value.currentTab = tab;
+};
+
+// 加载直播间数据
+const loadLiveRoom = async () => {
+  const id = route.query.id as string;
+  if (!id) return;
+  
+  try {
+    liveRoom.value = await LiveBroadcastService.get(id);
+    if (liveRoom.value) {
+      roomName.value = liveRoom.value.live_name;
+    }
+  } catch (error) {
+    console.error('加载直播间数据失败:', error);
+  }
+};
+
+// 组件挂载时加载数据
+onMounted(() => {
+  loadLiveRoom();
+  loadProducts();
+});
 
 </script>
 
@@ -476,11 +537,11 @@ interface Product {
               class="px-4 py-2 cursor-pointer text-[14px] hover:bg-[#E5E6EB]"
               :class="{
                 'bg-[#E5E6EB]': !isMultiSelect && currentProduct?.id === product.id,
-                'bg-blue-50': isMultiSelect && selectedProducts.includes(product.id)
+                'bg-blue-50': isMultiSelect && selectedProducts.includes(product.id!)
               }"
               @click="handleSelectProduct(product)"
             >
-              {{ product.name }}
+              {{ product.product_id }}
             </div>
           </template>
         </div>

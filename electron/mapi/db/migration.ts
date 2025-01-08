@@ -93,6 +93,47 @@ const versions = [
             )`);
             await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_live_broadcast_room_id 
                     ON live_broadcast_room (id)`);
+            await db.execute(`CREATE TABLE IF NOT EXISTS live_product (
+                    id VARCHAR(100) NOT NULL,
+                    live_id VARCHAR(100),
+                    product_id VARCHAR(100),
+                    ording INTEGER,
+                    state VARCHAR(20),
+                    create_date TIMESTAMP,
+                    creator VARCHAR(100),
+                    updater VARCHAR(100),
+                    update_date TIMESTAMP,
+                    script_index INTEGER,
+                    PRIMARY KEY (id)
+            )`);
+            await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_live_product_id 
+                    ON live_product (id)`);
+            await db.execute(`CREATE TABLE IF NOT EXISTS product (
+                    id VARCHAR(100) NOT NULL,
+                    product_type_id VARCHAR(100),
+                    product_backroud VARCHAR(40),
+                    product_describe VARCHAR(200),
+                    product_name VARCHAR(40),
+                    state VARCHAR(100),
+                    create_date TIMESTAMP,
+                    creator VARCHAR(100),
+                    updater VARCHAR(100),
+                    update_date TIMESTAMP,
+                    productAdvantages VARCHAR(4000),
+                    prodectName VARCHAR(4000),
+                    targetAudience VARCHAR(4000),
+                    price VARCHAR(100),
+                    exclusivePrice VARCHAR(8000),
+                    liveAdvantages VARCHAR(8000),
+                    liveGuarantee VARCHAR(8000),
+                    answerType INTEGER,
+                    agentId VARCHAR(100),
+                    script_index INTEGER,
+                    is_delete INTEGER,
+                    PRIMARY KEY (id)
+            )`);
+            await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_product_id 
+                    ON product (id)`);
         }
     },
 ]
