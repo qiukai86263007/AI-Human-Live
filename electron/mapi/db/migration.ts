@@ -78,6 +78,21 @@ const versions = [
                     endTime INTEGER,
                     resultMp4 TEXT
             )`);
+            await db.execute(`CREATE TABLE IF NOT EXISTS live_broadcast_room (
+                    id VARCHAR(100) NOT NULL,
+                    live_name VARCHAR(100),
+                    live_introduction VARCHAR(500),
+                    state VARCHAR(100),
+                    create_date TIMESTAMP,
+                    creator VARCHAR(100),
+                    updater VARCHAR(100),
+                    update_date TIMESTAMP,
+                    video_duration VARCHAR(100),
+                    audio_live_on INTEGER,
+                    PRIMARY KEY (id)
+            )`);
+            await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_live_broadcast_room_id 
+                    ON live_broadcast_room (id)`);
         }
     },
 ]

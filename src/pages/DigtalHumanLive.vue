@@ -1,51 +1,47 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { Input, Select, DatePicker, Button, Card } from '@arco-design/web-vue';
+import { ref, computed, onMounted } from 'vue';
 import CreateLiveRoomDialog from '../components/Live/CreateLiveRoomDialog.vue';
+import LiveBroadcastService, { LiveBroadcastRecord } from '../service/LiveBroadcastService';
 
+const createDialog = ref();
+const liveRooms = ref<LiveBroadcastRecord[]>([]);
 const searchText = ref('');
 const selectedType = ref('全部');
 const dateRange = ref([]);
 
 const typeOptions = [
   { label: '全部', value: '全部' },
-  { label: '编辑中', value: '编辑中' },
-  { label: '待开播', value: '待开播' },
-  { label: '直播中', value: '直播中' },
+  { label: '编辑中', value: 'editing' },
+  { label: '待开播', value: 'created' },
+  { label: '直播中', value: 'running' },
 ];
 
-// 原始数据
-const originalRooms = ref([
-  {
-    title: '零食大放送',
-    status: '编辑中',
-    startTime: '2025/1/3 14:25:48',
-  },
-  {
-    title: '快手-俄罗斯糖果巧克力',
-    status: '待开播',
-    startTime: '2025/1/2 15:21:51',
-  },
-]);
+// 加载直播间列表
+const loadLiveRooms = async () => {
+  try {
+    liveRooms.value = await LiveBroadcastService.list();
+  } catch (error) {
+    console.error('加载直播间列表失败:', error);
+  }
+};
 
 // 过滤后的数据
-const rooms = computed(() => {
-  return originalRooms.value.filter(room => {
+const filteredRooms = computed(() => {
+  return liveRooms.value.filter(room => {
     // 标题搜索过滤
-    const matchSearch = searchText.value ? 
-      room.title.toLowerCase().includes(searchText.value.toLowerCase()) : 
+    const matchSearch = searchText.value ?
+      room.live_name.toLowerCase().includes(searchText.value.toLowerCase()) :
       true;
 
     // 状态类型过滤
-    const matchType = selectedType.value === '全部' ? 
-      true : 
-      room.status === selectedType.value;
+    const matchType = selectedType.value === '全部' ?
+      true :
+      room.state === selectedType.value;
 
     // 日期范围过滤
     let matchDate = true;
     if (dateRange.value && dateRange.value.length === 2) {
-      // 将日期字符串转换为时间戳进行比较
-      const roomDate = new Date(room.startTime).getTime();
+      const roomDate = new Date(room.create_date).getTime();
       const start = new Date(dateRange.value[0]);
       const end = new Date(dateRange.value[1]);
       start.setHours(0, 0, 0, 0);
@@ -64,30 +60,49 @@ const resetFilters = () => {
   dateRange.value = [];
 };
 
-// 刷新数据
-const refreshData = async () => {
-  try {
-    // TODO: 从API获取数据
-    // const response = await api.getRooms();
-    // originalRooms.value = response.data;
-  } catch (error) {
-    console.error('Failed to fetch rooms:', error);
+// 组件挂载时加载数据
+onMounted(() => {
+  loadLiveRooms();
+});
+
+const handleCreate = () => {
+  createDialog.value?.show();
+};
+
+const getStateColor = (state?: string) => {
+  switch (state) {
+    case 'editing':
+      return 'blue';
+    case 'created':
+      return 'orange';
+    case 'running':
+      return 'green';
+    default:
+      return 'gray';
   }
 };
 
-const createLiveRoomDialog = ref();
-
-const handleCreateRoom = () => {
-  createLiveRoomDialog.value?.show();
+const getStateText = (state?: string) => {
+  switch (state) {
+    case 'editing':
+      return '编辑中';
+    case 'created':
+      return '待开播';
+    case 'running':
+      return '直播中';
+    default:
+      return '未知状态';
+  }
 };
-
 </script>
 
 <template>
   <div class="p-6">
     <!-- 标题 -->
-    <div class="text-2xl font-bold mb-6">数字人直播</div>
-    
+    <div class="mb-6 flex justify-between items-center">
+      <div class="text-2xl font-medium">AI数字人直播</div>
+    </div>
+
     <!-- 搜索过滤区 -->
     <div class="flex items-center gap-4 mb-6">
       <a-input
@@ -95,88 +110,73 @@ const handleCreateRoom = () => {
         placeholder="搜索直播间名称"
         class="w-64"
         allow-clear
-        @clear="refreshData"
       >
         <template #prefix>
           <icon-search />
         </template>
       </a-input>
-      
+
       <a-select
         v-model="selectedType"
         :style="{ width: '120px' }"
         :options="typeOptions"
-        @change="refreshData"
       />
-      
+
       <a-range-picker
         v-model="dateRange"
         class="w-72"
-        @change="refreshData"
       />
-      
+
       <a-button @click="resetFilters">
         <template #icon>
           <icon-refresh />
         </template>
         重置
       </a-button>
-    </div>
 
-    <!-- 创建直播间按钮 -->
-    <div class="flex justify-between items-center mb-6">
-      <a-button type="primary" size="large" @click="handleCreateRoom">
-        <template #icon>
-          <icon-plus />
-        </template>
-        创建直播间
+      <div class="flex-grow"></div>
+
+      <a-button type="primary" @click="handleCreate">
+        新建直播间
       </a-button>
     </div>
 
-    <!-- 空状态提示 -->
-    <div v-if="rooms.length === 0" class="flex flex-col items-center justify-center py-20">
-      <div class="text-gray-400 mb-4">
-        <icon-empty class="text-6xl" />
-      </div>
-      <div class="text-gray-400 mb-4">
-        {{ searchText || selectedType !== '全部' || dateRange.length ? 
-           '没有找到符合条件的直播间' : 
-           '暂无直播间，请创建新的直播间' }}
-      </div>
-    </div>
-
     <!-- 直播间列表 -->
-    <div v-else class="grid grid-cols-4 gap-4">
-      <a-card
-        v-for="room in rooms"
-        :key="room.title"
-        class="hover:shadow-lg transition-shadow"
-      >
-        <div class="relative aspect-video bg-gray-100 mb-3">
-          <!-- 状态标签 -->
-          <div class="absolute left-2 top-2 px-2 py-1 text-sm text-white rounded"
-               :class="{
-                 'bg-blue-500': room.status === '编辑中',
-                 'bg-yellow-500': room.status === '待开播',
-                 'bg-green-500': room.status === '直播中'
-               }">
-            {{ room.status }}
+    <div class="grid grid-cols-5 gap-6">
+      <template v-if="filteredRooms.length">
+        <div v-for="room in filteredRooms"
+             :key="room.id"
+             class="bg-[#1D1E2B] rounded-lg overflow-hidden cursor-pointer hover:bg-[#2A2B3B] transition-colors"
+             @click="router.push({ path: 'live-room/edit', query: { id: room.id }})"
+        >
+          <div class="aspect-video bg-black/20">
+            <!-- 预览图位置 -->
+          </div>
+          <div class="p-4">
+            <div class="text-white font-medium mb-2">{{ room.live_name }}</div>
+            <div class="text-gray-400 text-sm line-clamp-2">{{ room.live_introduction }}</div>
+            <div class="mt-2 flex justify-between items-center">
+              <a-tag :color="getStateColor(room.state)">
+                {{ getStateText(room.state) }}
+              </a-tag>
+              <span class="text-sm text-gray-500">
+                {{ new Date(room.create_date).toLocaleDateString() }}
+              </span>
+            </div>
           </div>
         </div>
-        
-        <div class="text-lg font-medium mb-2">{{ room.title }}</div>
-        <div class="text-gray-500 text-sm">{{ room.startTime }}</div>
-        
-        <div class="mt-3 flex gap-2">
-          <a-button type="text">进入直播</a-button>
-          <a-button type="text">
-            <icon-more-vertical />
-          </a-button>
+      </template>
+      <template v-else>
+        <div class="col-span-5 text-center py-12 text-gray-400">
+          {{ searchText || selectedType !== '全部' || dateRange.length ?
+             '没有找到符合条件的直播间' :
+             '暂无直播间，点击右上角创建' }}
         </div>
-      </a-card>
+      </template>
     </div>
+
+    <CreateLiveRoomDialog ref="createDialog" />
   </div>
-  <CreateLiveRoomDialog ref="createLiveRoomDialog" />
 </template>
 
 <style scoped>
