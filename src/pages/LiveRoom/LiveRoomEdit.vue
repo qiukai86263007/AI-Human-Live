@@ -119,25 +119,13 @@ interface QuestionCategory {
   qas: QA[];
 }
 
-const questionCategories = ref<QuestionCategory[]>([
-  {
-    id: 1,
-    name: '价格',
-    qas: [
-      { id: 1, question: '这个产品多少钱？', answer: '这个产品的价格是99元。' }
-    ]
-  },
-  {
-    id: 2,
-    name: '规格',
-    qas: [
-      { id: 2, question: '有什么规格可选？', answer: '我们有大中小三种规格可选。' }
-    ]
-  }
-]);
-
 // 新增问题种类
 const addNewCategory = () => {
+  if (!currentProduct.value) {
+    Message.warning('请先选择产品');
+    return;
+  }
+
   editingCategory.value = {
     id: Date.now(),
     name: '',
@@ -148,7 +136,12 @@ const addNewCategory = () => {
 
 // 添加新的Q&A
 const addQA = (categoryId: number) => {
-  const category = questionCategories.value.find(c => c.id === categoryId);
+  if (!currentProduct.value) {
+    Message.warning('请先选择产品');
+    return;
+  }
+
+  const category = currentProduct.value.questionCategories.find(c => c.id === categoryId);
   if (category) {
     editingQA.value = {
       id: Date.now(),
@@ -180,16 +173,21 @@ const deleteCategory = (categoryId: number) => {
 
 // 编辑Q&A
 const editQA = (categoryId: number, qa: QA) => {
-  const category = questionCategories.value.find(c => c.id === categoryId);
+  if (!currentProduct.value) return;
+
+  const category = currentProduct.value.questionCategories.find(c => c.id === categoryId);
   if (category) {
     editingQA.value = JSON.parse(JSON.stringify(qa));
+    editingQA.value._categoryId = categoryId;
     showEditQADialog.value = true;
   }
 };
 
 // 删除Q&A
 const deleteQA = (categoryId: number, qaId: number) => {
-  const category = questionCategories.value.find(c => c.id === categoryId);
+  if (!currentProduct.value) return;
+
+  const category = currentProduct.value.questionCategories.find(c => c.id === categoryId);
   if (category) {
     category.qas = category.qas.filter(qa => qa.id !== qaId);
   }
@@ -197,6 +195,8 @@ const deleteQA = (categoryId: number, qaId: number) => {
 
 // 保存编辑的Q&A
 const saveQA = () => {
+  if (!currentProduct.value) return;
+
   // 如果问题和答案都为空，则不保存
   if (!editingQA.value.question.trim() || !editingQA.value.answer.trim()) {
     showEditQADialog.value = false;
@@ -204,7 +204,7 @@ const saveQA = () => {
     return;
   }
   
-  questionCategories.value = questionCategories.value.map(category => {
+  currentProduct.value.questionCategories = currentProduct.value.questionCategories.map(category => {
     // 只在对应的分类中添加或更新Q&A
     if (category.id === editingQA.value._categoryId) {
       const qaIndex = category.qas.findIndex(qa => qa.id === editingQA.value?.id);
@@ -220,22 +220,25 @@ const saveQA = () => {
   
   showEditQADialog.value = false;
   editingQA.value = { id: 0, question: '', answer: '' };
+  Message.success('保存成功');
 };
 
 // 保存编辑的问题种类
 const saveCategory = () => {
+  if (!currentProduct.value) return;
+  
   if (!editingCategory.value.name.trim()) {
     showEditCategoryDialog.value = false;
     editingCategory.value = { id: 0, name: '', qas: [] };
     return;
   }
   
-  const index = questionCategories.value.findIndex(c => c.id === editingCategory.value?.id);
+  const index = currentProduct.value.questionCategories.findIndex(c => c.id === editingCategory.value?.id);
   if (index !== -1) {
-    questionCategories.value[index] = { ...editingCategory.value };
+    currentProduct.value.questionCategories[index] = { ...editingCategory.value };
   } else {
     // 如果找不到现有的种类，说明是新增
-    questionCategories.value.push({ ...editingCategory.value });
+    currentProduct.value.questionCategories.push({ ...editingCategory.value });
   }
   
   showEditCategoryDialog.value = false;
@@ -269,16 +272,21 @@ const isAllSelected = computed(() => {
 
 // 处理新建产品
 const handleCreateProduct = () => {
-  const newProduct = {
+  const newProduct: Product = {
     id: Date.now(),
-    name: `产品${productList.value.length + 1}`
+    name: `产品${productList.value.length + 1}`,
+    currentTab: '主播选择',
+    selectedAnchors: [],
+    scripts: [],
+    questionCategories: []
   };
   productList.value.push(newProduct);
   currentProduct.value = newProduct;
+  currentTab.value = newProduct.currentTab;
 };
 
 // 处理选择产品
-const handleSelectProduct = (product: { id: number; name: string }) => {
+const handleSelectProduct = (product: Product) => {
   if (isMultiSelect.value) {
     // 多选模式：切换选中状态
     const index = selectedProducts.value.indexOf(product.id);
@@ -288,9 +296,10 @@ const handleSelectProduct = (product: { id: number; name: string }) => {
       selectedProducts.value.push(product.id);
     }
   } else {
-    // 单选模式：直接选中当前产品
+    // 单选模式：切换到产品对应的选项卡
     currentProduct.value = product;
     selectedProducts.value = [product.id];
+    currentTab.value = product.currentTab;
   }
 };
 
@@ -328,6 +337,16 @@ const handleDelete = () => {
   if (currentProduct.value && selectedProducts.value.includes(currentProduct.value.id)) {
     currentProduct.value = null;
   }
+};
+
+// 添加选项卡切换处理函数
+const handleTabChange = (tab: string) => {
+  if (!currentProduct.value) {
+    Message.warning('请先选择产品');
+    return;
+  }
+  currentTab.value = tab;
+  currentProduct.value.currentTab = tab;
 };
 
 </script>
@@ -457,8 +476,12 @@ const handleDelete = () => {
         <div v-for="tab in tabs" 
              :key="tab.key"
              class="py-4 px-2 cursor-pointer flex flex-col items-center"
-             :class="currentTab === tab.key ? 'bg-blue-500/10 text-blue-500' : 'text-gray-400'"
-             @click="currentTab = tab.key"
+             :class="{
+               'bg-blue-500/10 text-blue-500': currentTab === tab.key,
+               'text-gray-400': currentTab !== tab.key,
+               'cursor-not-allowed': !currentProduct
+             }"
+             @click="handleTabChange(tab.key)"
         >
           <i :class="tab.icon" class="text-xl mb-1"></i>
           <span class="text-xs">{{ tab.key }}</span>
@@ -680,7 +703,10 @@ const handleDelete = () => {
                 <!-- 问答列表 -->
                 <div class="space-y-4">
                   <!-- 问题种类列表 -->
-                  <div v-for="category in questionCategories" :key="category.id" class="bg-[#1D1E2B] rounded-lg p-4">
+                  <div v-for="category in currentProduct?.questionCategories" 
+                       :key="category.id" 
+                       class="bg-[#1D1E2B] rounded-lg p-4"
+                  >
                     <div class="flex items-center justify-between mb-4">
                       <div class="text-gray-300 font-medium">{{ category.name }}</div>
                       <div class="flex items-center gap-2">
