@@ -255,6 +255,81 @@ const handleSettingsBack = () => {
   showPlatformDialog.value = true;
 };
 
+// 产品列表数据
+const productList = ref<Array<{ id: number; name: string }>>([]);
+const currentProduct = ref<{ id: number; name: string } | null>(null);
+// 选择模式
+const isMultiSelect = ref(false);
+// 选中的产品ID列表
+const selectedProducts = ref<number[]>([]);
+// 是否全选
+const isAllSelected = computed(() => {
+  return productList.value.length > 0 && selectedProducts.value.length === productList.value.length;
+});
+
+// 处理新建产品
+const handleCreateProduct = () => {
+  const newProduct = {
+    id: Date.now(),
+    name: `产品${productList.value.length + 1}`
+  };
+  productList.value.push(newProduct);
+  currentProduct.value = newProduct;
+};
+
+// 处理选择产品
+const handleSelectProduct = (product: { id: number; name: string }) => {
+  if (isMultiSelect.value) {
+    // 多选模式：切换选中状态
+    const index = selectedProducts.value.indexOf(product.id);
+    if (index > -1) {
+      selectedProducts.value.splice(index, 1);
+    } else {
+      selectedProducts.value.push(product.id);
+    }
+  } else {
+    // 单选模式：直接选中当前产品
+    currentProduct.value = product;
+    selectedProducts.value = [product.id];
+  }
+};
+
+// 处理全选
+const handleSelectAll = (checked: boolean) => {
+  if (checked) {
+    selectedProducts.value = productList.value.map(product => product.id);
+  } else {
+    selectedProducts.value = [];
+  }
+};
+
+// 处理多选切换
+const handleMultiSelect = (checked: boolean) => {
+  isMultiSelect.value = checked;
+  if (!checked) {
+    // 退出多选模式时，清空选择
+    selectedProducts.value = [];
+  }
+};
+
+// 处理删除
+const handleDelete = () => {
+  if (selectedProducts.value.length === 0) return;
+  
+  // 过滤掉选中的产品
+  productList.value = productList.value.filter(
+    product => !selectedProducts.value.includes(product.id)
+  );
+  
+  // 清空选择
+  selectedProducts.value = [];
+  
+  // 如果当前选中的产品被删除，清空currentProduct
+  if (currentProduct.value && selectedProducts.value.includes(currentProduct.value.id)) {
+    currentProduct.value = null;
+  }
+};
+
 </script>
 
 <template>
@@ -304,9 +379,26 @@ const handleSettingsBack = () => {
         <div class="px-4 pt-4 pb-2">
           <div class="text-lg mb-2 font-medium">产品列表</div>
           <div class="flex items-center gap-4">
-            <a-checkbox>全选</a-checkbox>
-            <a-checkbox>多选</a-checkbox>
-            <a-button size="mini" status="danger">
+            <a-checkbox
+              :model-value="isAllSelected"
+              :disabled="productList.length === 0"
+              @change="handleSelectAll"
+            >
+              全选
+            </a-checkbox>
+            <a-checkbox
+              v-model="isMultiSelect"
+              :disabled="productList.length === 0"
+              @change="handleMultiSelect"
+            >
+              多选
+            </a-checkbox>
+            <a-button 
+              size="mini" 
+              status="danger"
+              :disabled="selectedProducts.length === 0"
+              @click="handleDelete"
+            >
               <template #icon>
                 <icon-delete />
               </template>
@@ -314,22 +406,44 @@ const handleSettingsBack = () => {
             </a-button>
           </div>
         </div>
-        <div class="flex-1 overflow-y-auto flex items-center justify-center text-gray-500">
-          <div class="text-center">
-            <div class="mb-4">
-              <icon-box class="text-4xl" />
+        <div class="flex-1 overflow-y-auto">
+          <template v-if="productList.length === 0">
+            <div class="h-full flex items-center justify-center text-gray-500">
+              <div class="text-center">
+                <div class="mb-4">
+                  <icon-box class="text-4xl" />
+                </div>
+              </div>
             </div>
-            <div>暂无产品</div>
-          </div>
+          </template>
+          <template v-else>
+            <div 
+              v-for="product in productList" 
+              :key="product.id"
+              class="px-4 py-2 cursor-pointer text-[14px] hover:bg-[#E5E6EB]"
+              :class="{
+                'bg-[#E5E6EB]': !isMultiSelect && currentProduct?.id === product.id,
+                'bg-blue-50': isMultiSelect && selectedProducts.includes(product.id)
+              }"
+              @click="handleSelectProduct(product)"
+            >
+              {{ product.name }}
+            </div>
+          </template>
         </div>
         <div class="p-4">
-          <a-button type="outline" class="w-full mb-2" status="primary">
+          <a-button 
+            type="primary" 
+            class="w-full mb-2"
+            status="primary"
+            @click="handleCreateProduct"
+          >
             <template #icon>
               <icon-plus />
             </template>
             新建产品
           </a-button>
-          <a-button type="primary" class="w-full mb-2">
+          <a-button type="primary" class="w-full">
             <template #icon>
               <icon-play />
             </template>
