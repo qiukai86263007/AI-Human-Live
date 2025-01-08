@@ -2,7 +2,9 @@
 import { ref, computed, onMounted } from 'vue';
 import CreateLiveRoomDialog from '../components/Live/CreateLiveRoomDialog.vue';
 import LiveBroadcastService, { LiveBroadcastRecord } from '../service/LiveBroadcastService';
+import { useRouter } from 'vue-router';
 
+const router = useRouter();
 const createDialog = ref();
 const liveRooms = ref<LiveBroadcastRecord[]>([]);
 const searchText = ref('');
@@ -29,13 +31,13 @@ const loadLiveRooms = async () => {
 const filteredRooms = computed(() => {
   return liveRooms.value.filter(room => {
     // 标题搜索过滤
-    const matchSearch = searchText.value ?
-      room.live_name.toLowerCase().includes(searchText.value.toLowerCase()) :
+    const matchSearch = searchText.value ? 
+      room.live_name.toLowerCase().includes(searchText.value.toLowerCase()) : 
       true;
 
     // 状态类型过滤
-    const matchType = selectedType.value === '全部' ?
-      true :
+    const matchType = selectedType.value === '全部' ? 
+      true : 
       room.state === selectedType.value;
 
     // 日期范围过滤
@@ -94,6 +96,14 @@ const getStateText = (state?: string) => {
       return '未知状态';
   }
 };
+
+const handleRoomClick = (room: LiveBroadcastRecord) => {
+  if (!room.id) return;
+  router.push({
+    path: '/live-room/edit',
+    query: { id: room.id }
+  });
+};
 </script>
 
 <template>
@@ -115,27 +125,27 @@ const getStateText = (state?: string) => {
           <icon-search />
         </template>
       </a-input>
-
+      
       <a-select
         v-model="selectedType"
         :style="{ width: '120px' }"
         :options="typeOptions"
       />
-
+      
       <a-range-picker
         v-model="dateRange"
         class="w-72"
       />
-
+      
       <a-button @click="resetFilters">
         <template #icon>
           <icon-refresh />
         </template>
         重置
       </a-button>
-
+      
       <div class="flex-grow"></div>
-
+      
       <a-button type="primary" @click="handleCreate">
         新建直播间
       </a-button>
@@ -144,10 +154,10 @@ const getStateText = (state?: string) => {
     <!-- 直播间列表 -->
     <div class="grid grid-cols-5 gap-6">
       <template v-if="filteredRooms.length">
-        <div v-for="room in filteredRooms"
-             :key="room.id"
+        <div v-for="room in filteredRooms" 
+             :key="room.id" 
              class="bg-[#1D1E2B] rounded-lg overflow-hidden cursor-pointer hover:bg-[#2A2B3B] transition-colors"
-             @click="router.push({ path: 'live-room/edit', query: { id: room.id }})"
+             @click="handleRoomClick(room)"
         >
           <div class="aspect-video bg-black/20">
             <!-- 预览图位置 -->
@@ -168,8 +178,8 @@ const getStateText = (state?: string) => {
       </template>
       <template v-else>
         <div class="col-span-5 text-center py-12 text-gray-400">
-          {{ searchText || selectedType !== '全部' || dateRange.length ?
-             '没有找到符合条件的直播间' :
+          {{ searchText || selectedType !== '全部' || dateRange.length ? 
+             '没有找到符合条件的直播间' : 
              '暂无直播间，点击右上角创建' }}
         </div>
       </template>
