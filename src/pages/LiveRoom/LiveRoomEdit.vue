@@ -73,13 +73,24 @@ const handleSearch = (value: string) => {
 
 // 添加到列表
 const addToList = (type: 'manual' | 'ai') => {
+  if (!currentProduct.value) {
+    Message.warning('请先选择产品');
+    return;
+  }
+
   const text = type === 'manual' ? manualText.value : aiGeneratedText.value;
-  scriptList.value.push({
+  if (!text.trim()) {
+    Message.warning('请输入内容');
+    return;
+  }
+
+  // 添加到当前产品的台词列表中
+  currentProduct.value.scripts.push({
     id: Date.now(),
-    text,
+    content: text,
     type
   });
-  
+
   // 清空输入
   if (type === 'manual') {
     manualText.value = '';
@@ -87,6 +98,8 @@ const addToList = (type: 'manual' | 'ai') => {
     aiGeneratedText.value = '';
     aiKeyword.value = '';
   }
+  
+  Message.success('添加成功');
 };
 
 // 处理脚本搜索
@@ -349,6 +362,27 @@ const handleTabChange = (tab: string) => {
   currentProduct.value.currentTab = tab;
 };
 
+interface Product {
+  id: number;
+  name: string;
+  currentTab: string;
+  selectedAnchors: number[];
+  scripts: Array<{
+    id: number;
+    content: string;
+    type: 'manual' | 'ai';
+  }>;
+  questionCategories: Array<{
+    id: number;
+    name: string;
+    qas: Array<{
+      id: number;
+      question: string;
+      answer: string;
+    }>;
+  }>;
+}
+
 </script>
 
 <template>
@@ -535,43 +569,34 @@ const handleTabChange = (tab: string) => {
                 </div>
                 <!-- 台词列表 -->
                 <div class="grid grid-cols-2 gap-4">
-                  <!-- 左侧文本台词 -->
-                  <div class="bg-white rounded-lg p-4 shadow">
-                    <div class="flex items-center justify-between mb-4">
-                      <div>123567</div>
-                      <div class="flex items-center gap-2">
-                        <a-tag>文本</a-tag>
-                        <a-button size="mini">
-                          <template #icon>
-                            <icon-play />
-                          </template>
-                          试听
-                        </a-button>
+                  <template v-if="currentProduct?.scripts.length">
+                    <div 
+                      v-for="script in currentProduct.scripts" 
+                      :key="script.id" 
+                      class="bg-white rounded-lg p-4 shadow"
+                    >
+                      <div class="flex items-center justify-between mb-4">
+                        <div>{{ script.content }}</div>
+                        <div class="flex items-center gap-2">
+                          <a-tag>{{ script.type === 'manual' ? '文本' : 'AI' }}</a-tag>
+                          <a-button size="mini">
+                            <template #icon>
+                              <icon-play />
+                            </template>
+                            试听
+                          </a-button>
+                        </div>
+                      </div>
+                      <div class="text-gray-400">
+                        AI解析: {{ script.type === 'ai' ? 1 : 0 }}
                       </div>
                     </div>
-                    <div class="text-gray-400">
-                      AI解析: 0
+                  </template>
+                  <template v-else>
+                    <div class="col-span-2 text-center text-gray-400 py-8">
+                      暂无台词内容
                     </div>
-                  </div>
-                  
-                  <!-- 右侧文本台词 -->
-                  <div class="bg-white rounded-lg p-4 shadow">
-                    <div class="flex items-center justify-between mb-4">
-                      <div>456</div>
-                      <div class="flex items-center gap-2">
-                        <a-tag>文本</a-tag>
-                        <a-button size="mini">
-                          <template #icon>
-                            <icon-play />
-                          </template>
-                          试听
-                        </a-button>
-                      </div>
-                    </div>
-                    <div class="text-gray-400">
-                      AI解析: 0
-                    </div>
-                  </div>
+                  </template>
                 </div>
               </div>
             </div>
