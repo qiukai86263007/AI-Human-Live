@@ -4,6 +4,7 @@ import ProductService from '../../service/ProductService';
 import { Message } from '@arco-design/web-vue';
 
 const visible = ref(false);
+const fileList = ref([]);
 const form = ref({
   product_name: '',
   product_type_id: '',
@@ -11,9 +12,25 @@ const form = ref({
   product_describe: ''
 });
 
+const handleImageChange = (files) => {
+  if (files.length > 0) {
+    // 这里可以处理图片，比如转base64或者上传到服务器
+    form.value.product_backroud = files[0].url || files[0].name;
+  } else {
+    form.value.product_backroud = '';
+  }
+};
+
 const handleSubmit = async () => {
+  // 表单验证
+  if (!form.value.product_name || !form.value.product_type_id || 
+      !form.value.product_backroud || !form.value.product_describe) {
+    Message.warning('请填写所有必填项');
+    return;
+  }
+
   try {
-    await ProductService.create({
+    const result = await ProductService.create({
       ...form.value,
       state: 'active',
       creator: 'current_user',
@@ -32,17 +49,15 @@ const handleSubmit = async () => {
     });
 
     visible.value = false;
-    Message.success('创建成功');
-    // 触发刷新事件
-    emit('refresh');
+    emit('success', result.id);
   } catch (error) {
-    console.error('创建产品失败:', error);
     Message.error('创建失败');
   }
 };
 
 const show = () => {
   visible.value = true;
+  fileList.value = [];
   form.value = {
     product_name: '',
     product_type_id: '',
@@ -51,7 +66,7 @@ const show = () => {
   };
 };
 
-const emit = defineEmits(['refresh']);
+const emit = defineEmits(['success']);
 
 defineExpose({
   show
@@ -89,10 +104,11 @@ defineExpose({
 
       <a-form-item field="product_backroud" label="产品图片" required>
         <a-upload
-          v-model="form.product_backroud"
+          v-model:file-list="fileList"
           action="/"
           :auto-upload="false"
           image-preview
+          @change="handleImageChange"
         />
       </a-form-item>
 

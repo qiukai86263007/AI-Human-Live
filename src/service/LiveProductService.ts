@@ -12,6 +12,9 @@ export type LiveProductRecord = {
     updater: string;
     update_date?: string;
     script_index: number;
+    product_name?: string;
+    product_backroud?: string;
+    product_describe?: string;
 }
 
 export const LiveProductService = {
@@ -25,6 +28,9 @@ export const LiveProductService = {
         }
         return {
             ...record,
+            product_name: record.product_name,
+            product_backroud: record.product_backroud,
+            product_describe: record.product_describe
         } as LiveProductRecord
     },
 
@@ -44,8 +50,14 @@ export const LiveProductService = {
     },
 
     async listByLiveId(liveId: string): Promise<LiveProductRecord[]> {
-        const records: LiveProductRecord[] = await window.$mapi.db.select(
-            `SELECT * FROM ${this.tableName()} WHERE live_id = ? ORDER BY ording ASC`,
+        const records: any[] = await window.$mapi.db.select(
+            `SELECT lp.id, lp.live_id, lp.product_id, lp.ording, lp.state, 
+                    lp.create_date, lp.creator, lp.updater, lp.update_date, 
+                    lp.script_index, p.product_name, p.product_backroud, p.product_describe 
+             FROM ${this.tableName()} lp
+             LEFT JOIN product p ON lp.product_id = p.id
+             WHERE lp.live_id = ? AND p.is_delete = 0
+             ORDER BY lp.ording ASC`,
             [liveId]
         )
         return records.map(this.decodeRecord) as LiveProductRecord[]
@@ -87,8 +99,7 @@ export const LiveProductService = {
 
     async delete(record: LiveProductRecord) {
         if (!record.id) throw new Error('Record ID is required');
-        console.log('Deleting product:', record.id);
-        await window.$mapi.db.delete(
+        return await window.$mapi.db.delete(
             `DELETE FROM ${this.tableName()} WHERE id = ?`,
             [record.id]
         )

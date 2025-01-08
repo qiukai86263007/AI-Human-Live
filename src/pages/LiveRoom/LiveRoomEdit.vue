@@ -4,13 +4,16 @@ import { useRouter, useRoute } from 'vue-router';
 import { Message } from '@arco-design/web-vue';
 import PlatformSelector from './PlatformSelector.vue';
 import PlatformSettings from './PlatformSettings.vue';
+import CreateProductDialog from '../../components/Product/CreateProductDialog.vue';
 import LiveBroadcastService, { LiveBroadcastRecord } from '../../service/LiveBroadcastService';
 import LiveProductService, { LiveProductRecord } from '../../service/LiveProductService';
+import ProductService, { ProductRecord } from '../../service/ProductService';
 
 const router = useRouter();
 const route = useRoute();
 const currentTab = ref('主播选择');
 const currentPage = ref(1);
+const createProductDialog = ref();
 const pageSize = 4; // 每页显示4个主播
 const isEditing = ref(false);
 const roomName = ref('');
@@ -305,7 +308,7 @@ interface ProductExtend extends LiveProductRecord {
 }
 
 // 产品列表数据
-const productList = ref<LiveProductRecord[]>([]);
+const productList = ref<ProductRecord[]>([]);
 const currentProduct = ref<ProductExtend | null>(null);
 // 选择模式
 const isMultiSelect = ref(false);
@@ -324,19 +327,26 @@ const loadProducts = async () => {
   try {
     productList.value = await LiveProductService.listByLiveId(id);
   } catch (error) {
-    console.error('加载产品列表失败:', error);
+    Message.error('加载产品列表失败');
   }
 };
 
 // 处理新建产品
-const handleCreateProduct = async () => {
+const handleCreateProduct = () => {
+  createProductDialog.value?.show();
+};
+
+// 处理产品创建成功
+const handleProductCreated = async (productId: string) => {
   const liveId = route.query.id as string;
   if (!liveId) return;
 
   try {
+    console.log('Creating live product relation:', { liveId, productId });
+    // 创建直播间-产品关联
     await LiveProductService.create({
       live_id: liveId,
-      product_id: `product_${Date.now()}`,
+      product_id: productId,
       ording: productList.value.length,
       state: 'active',
       creator: 'current_user',
@@ -347,30 +357,37 @@ const handleCreateProduct = async () => {
     await loadProducts();
     Message.success('创建成功');
   } catch (error) {
-    console.error('创建产品失败:', error);
-    Message.error('创建失败');
+    console.error('关联产品失败:', error);
+    Message.error('关联产品失败');
   }
 };
 
 // 处理选择产品
-const handleSelectProduct = (product: LiveProductRecord) => {
+const handleSelectProduct = (product: ProductRecord) => {
   if (isMultiSelect.value) {
     // 多选模式：切换选中状态
-    const index = selectedProducts.value.indexOf(product.id);
+    const index = selectedProducts.value.indexOf(product.id!);
     if (index > -1) {
       selectedProducts.value.splice(index, 1);
     } else {
-      selectedProducts.value.push(product.id);
+      selectedProducts.value.push(product.id!);
     }
   } else {
     // 单选模式：切换到产品对应的选项卡
     const extendedProduct: ProductExtend = {
-      ...product,
+      id: product.id,
+      live_id: route.query.id as string,
+      product_id: product.id!,
+      ording: 0,
+      state: 'active',
+      creator: 'current_user',
+      updater: 'current_user',
+      script_index: 0,
       scripts: [],
       questionCategories: []
     };
     currentProduct.value = extendedProduct;
-    selectedProducts.value = [product.id];
+    selectedProducts.value = [product.id!];
     currentTab.value = '主播选择';
   }
 };
@@ -403,12 +420,21 @@ const handleDelete = async () => {
       currentProduct.value = null;
     }
 
-    await LiveProductService.batchDelete(selectedProducts.value);
+    const liveId = route.query.id as string;
+    const liveProducts = await LiveProductService.listByLiveId(liveId);
+    const toDelete = liveProducts.filter(lp => {
+      return selectedProducts.value.includes(lp.id!);
+    });
+    
+    for (const liveProduct of toDelete) {
+      await ProductService.delete({ id: liveProduct.product_id });
+      await LiveProductService.delete(liveProduct);
+    }
+
     await loadProducts();
     selectedProducts.value = [];
     Message.success('删除成功');
   } catch (error) {
-    console.error('删除产品失败:', error);
     Message.error('删除失败');
   }
 };
@@ -541,7 +567,7 @@ onMounted(() => {
               }"
               @click="handleSelectProduct(product)"
             >
-              {{ product.product_id }}
+              {{ product.product_name }}
             </div>
           </template>
         </div>
@@ -977,6 +1003,12 @@ onMounted(() => {
     :platform="selectedPlatform"
     @back="handleSettingsBack"
     @close="showPlatformSettings = false"
+  />
+
+  <!-- 添加创建产品对话框 -->
+  <CreateProductDialog 
+    ref="createProductDialog"
+    @success="handleProductCreated"
   />
 </template>
 

@@ -72,11 +72,12 @@ export const ProductService = {
         const values = fields.map(f => record[f])
         const valuesPlaceholder = fields.map(f => '?')
         
-        return await window.$mapi.db.insert(
+        await window.$mapi.db.insert(
             `INSERT INTO ${this.tableName()} (${fields.join(',')})
              VALUES (${valuesPlaceholder.join(',')})`,
             values
         )
+        return { id: record.id }
     },
 
     async update(id: string, record: Partial<ProductRecord>) {
