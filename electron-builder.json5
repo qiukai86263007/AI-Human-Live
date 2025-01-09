@@ -18,6 +18,11 @@
         {
             "from": "node_modules/ffmpeg-static",
             "to": "bin/ffmpeg",
+        },
+        {
+            "from": "resources",
+            "to": "userData",
+            "filter": ["**/*"]
         }
     ],
     "win": {

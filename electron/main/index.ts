@@ -1,5 +1,7 @@
 import {app, BrowserWindow, desktopCapturer, session, shell} from 'electron'
 import {optimizer} from '@electron-toolkit/utils'
+import {join} from 'path'
+import fs from 'fs-extra'
 
 /** process.js 必须位于非依赖项的顶部 */
 import {isDummy} from "../lib/process";
@@ -20,6 +22,7 @@ import {isPackaged} from "../lib/env";
 import {executeHooks} from "../lib/hooks";
 import {DevToolsManager} from "../lib/devtools";
 import {AppsMain} from "../mapi/app/main";
+import {Files} from '../mapi/file/main'
 
 const isDummyNew = isDummy
 
@@ -61,7 +64,27 @@ Log.info('LaunchInfo', {
     userData: AppEnv.userData
 })
 
+// 开发环境下复制资源文件到用户数据目录
+async function copyResourcesInDev() {
+    if (process.env.NODE_ENV === 'development') {
+        const userDataPath = app.getPath('userData');
+        const resourcePath = join(process.cwd(), 'resources');
+        const targetPath = join(userDataPath, 'resources');
+
+        try {
+            if (fs.existsSync(resourcePath)) {
+                await fs.copy(resourcePath, targetPath);
+                console.log('开发环境: 资源文件已复制到用户数据目录');
+            }
+        } catch (error) {
+            console.error('复制资源文件失败:', error);
+        }
+    }
+}
+
 async function createWindow() {
+    await copyResourcesInDev();
+
     let icon = logoPath
     if (process.platform === 'win32') {
         icon = icoLogoPath
