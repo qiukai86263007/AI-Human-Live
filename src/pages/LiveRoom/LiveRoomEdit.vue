@@ -32,6 +32,7 @@ const showPlatformSettings = ref(false);
 const selectedPlatform = ref('');
 const liveRoom = ref<LiveBroadcastRecord | null>(null);
 const anchors = ref<AnchorRecord[]>([]);
+const selectedAnchor = ref<AnchorRecord | null>(null);
 
 const tabs = [
   { key: '主播选择', icon: 'icon-user' },
@@ -465,6 +466,11 @@ const getImagePath = (path: string) => {
   return `file://${path}`;
 };
 
+// 处理主播选择
+const handleAnchorSelect = (anchor: AnchorRecord) => {
+  selectedAnchor.value = anchor;
+};
+
 // 组件挂载时加载数据
 onMounted(() => {
   loadLiveRoom();
@@ -616,10 +622,18 @@ onMounted(() => {
         <!-- 主播选择面板 -->
         <div v-if="currentTab === '主播选择'">
           <div class="flex items-center mb-4">
-            <div>当前主播 /</div>
+            <div>当前主播 / {{ selectedAnchor?.anchor_name || '未选择' }}</div>
           </div>
-          <div class="aspect-video rounded-lg flex items-center justify-center text-gray-500">
-            请选择主播
+          <div class="aspect-video rounded-lg flex items-center justify-center bg-gray-50">
+            <template v-if="selectedAnchor">
+              <img :src="getImagePath(selectedAnchor.anchor_backgroud)"
+                   :alt="selectedAnchor.anchor_name"
+                   class="h-full object-contain"
+              />
+            </template>
+            <template v-else>
+              <div class="text-gray-500">请选择主播</div>
+            </template>
           </div>
           <div class="mt-4 flex justify-center">
             <a-button type="outline">
@@ -925,7 +939,7 @@ onMounted(() => {
             <a-tab-pane key="2" title="我的主播" />
           </a-tabs>
         </div>
-        <div class="mb-4">
+        <div>
           <a-input-search 
             placeholder="搜索主播" 
             allow-clear
@@ -936,15 +950,24 @@ onMounted(() => {
         </div>
         
         <!-- 主播列表 -->
-        <div class="grid grid-cols-2 gap-4 min-h-[500px]">
+        <div class="grid grid-cols-2 min-h-[500px]">
           <div v-for="anchor in currentAnchors" 
                :key="anchor.id" 
-               class="aspect-[3/4] rounded-lg overflow-hidden relative group">
-            <img :src="getImagePath(anchor.anchor_backgroud)" 
-                 :alt="anchor.anchor_name"
-                 class="w-full h-full object-cover" 
-            />
-            <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 p-2">
+               class="flex flex-col cursor-pointer"
+               @click="handleAnchorSelect(anchor)">
+            <div class="aspect-[3/4] rounded-lg overflow-hidden relative">
+              <img :src="getImagePath(anchor.anchor_backgroud)" 
+                   :alt="anchor.anchor_name"
+                   class="w-full h-full object-cover" 
+              />
+              <div v-if="selectedAnchor?.id === anchor.id"
+                   class="absolute inset-0 ring-4 ring-blue-500 ring-opacity-75">
+                <div class="absolute top-1 right-1 bg-blue-500 rounded-full p-1">
+                  <i class="text-white text-lg icon-check"></i>
+                </div>
+              </div>
+            </div>
+            <div class="text-center">
               <div class="text-sm">{{ anchor.anchor_name }}</div>
             </div>
           </div>
