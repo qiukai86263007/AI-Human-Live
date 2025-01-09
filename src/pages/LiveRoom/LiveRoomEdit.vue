@@ -9,6 +9,7 @@ import LiveBroadcastService, { LiveBroadcastRecord } from '../../service/LiveBro
 import LiveProductService, { LiveProductRecord } from '../../service/LiveProductService';
 import ProductService, { ProductRecord } from '../../service/ProductService';
 import AnchorService, { AnchorRecord } from '../../service/AnchorService';
+import ProductSceneService, { ProductSceneRecord } from '../../service/ProductSceneService';
 
 const router = useRouter();
 const route = useRoute();
@@ -33,6 +34,7 @@ const selectedPlatform = ref('');
 const liveRoom = ref<LiveBroadcastRecord | null>(null);
 const anchors = ref<AnchorRecord[]>([]);
 const selectedAnchor = ref<AnchorRecord | null>(null);
+const currentProductScene = ref<ProductSceneRecord | null>(null);
 
 const tabs = [
   { key: '主播选择', icon: 'icon-user' },
@@ -285,22 +287,13 @@ const handleSettingsBack = () => {
   showPlatformDialog.value = true;
 };
 
-interface ProductExtend extends LiveProductRecord {
+interface ProductExtend extends ProductRecord {
+  live_id?: string;
+  product_id?: string;
+  ording?: number;
   currentTab?: string;
-  scripts: Array<{
-    id: number;
-    content: string;
-    type: 'manual' | 'ai';
-  }>;
-  questionCategories: Array<{
-    id: number;
-    name: string;
-    qas: Array<{
-      id: number;
-      question: string;
-      answer: string;
-    }>;
-  }>;
+  scripts: Script[];
+  questionCategories: QuestionCategory[];
 }
 
 // 产品列表数据
@@ -359,7 +352,7 @@ const handleProductCreated = async (productId: string) => {
 };
 
 // 处理选择产品
-const handleSelectProduct = (product: ProductRecord) => {
+const handleSelectProduct = async (product: ProductRecord) => {
   if (isMultiSelect.value) {
     // 多选模式：切换选中状态
     const index = selectedProducts.value.indexOf(product.id!);
@@ -368,23 +361,82 @@ const handleSelectProduct = (product: ProductRecord) => {
     } else {
       selectedProducts.value.push(product.id!);
     }
-  } else {
-    // 单选模式：切换到产品对应的选项卡
-    const extendedProduct: ProductExtend = {
-      id: product.id,
-      live_id: route.query.id as string,
-      product_id: product.id!,
-      ording: 0,
-      state: 'active',
-      creator: 'current_user',
-      updater: 'current_user',
-      script_index: 0,
-      scripts: [],
-      questionCategories: []
-    };
-    currentProduct.value = extendedProduct;
-    selectedProducts.value = [product.id!];
-    currentTab.value = '主播选择';
+    return;
+  }
+  
+  // 重置主播选择
+  selectedAnchor.value = null;
+  currentProductScene.value = null;
+  
+  currentProduct.value = {
+    ...product,
+    live_id: route.query.id as string,
+    product_id: product.id!,
+    ording: 0,
+    scripts: [],
+    questionCategories: [],
+    currentTab: currentTab.value
+  } as ProductExtend;
+  
+  currentTab.value = '主播选择';
+  selectedProducts.value = [product.id!];
+  
+  // 加载该产品关联的主播场景
+  await loadProductScene(product.id!);
+};
+
+// 加载产品场景
+const loadProductScene = async (productId: string) => {
+  if (!productId) return;
+  try {
+    const scenes = await ProductSceneService.listByProductId(productId);
+    if (scenes.length > 0) {
+      currentProductScene.value = scenes[0];
+      // 如果存在场景，自动选中对应的主播
+      const anchor = await AnchorService.get(scenes[0].anchor_id);
+      if (anchor) {
+        selectedAnchor.value = anchor;
+      }
+    }
+  } catch (error) {
+    console.error('加载产品场景失败:', error);
+  }
+};
+
+// 保存当前设置
+const saveCurrentSettings = async () => {
+  if (!currentProduct.value?.id || !selectedAnchor.value) {
+    Message.warning('请先选择产品和主播');
+    return;
+  }
+
+  try {
+    if (currentProductScene.value) {
+      // 更新现有场景
+      await ProductSceneService.update(currentProductScene.value.id!, {
+        anchor_id: selectedAnchor.value.id,
+        anchor_url: selectedAnchor.value.anchor_backgroud,
+        updater: 'system'
+      });
+    } else {
+      // 创建新场景
+      await ProductSceneService.create({
+        scene_name: `${currentProduct.value.product_name}_场景`,
+        anchor_url: selectedAnchor.value.anchor_backgroud,
+        anchor_id: selectedAnchor.value.id,
+        product_id: currentProduct.value.id,
+        ording: 1,
+        gender: 'unknown',
+        anchor_video_url: '',
+        creator: 'system',
+        updater: 'system'
+      });
+    }
+    Message.success('保存成功');
+    await loadProductScene(currentProduct.value.id);
+  } catch (error) {
+    console.error('保存设置失败:', error);
+    Message.error('保存失败');
   }
 };
 
@@ -636,7 +688,11 @@ onMounted(() => {
             </template>
           </div>
           <div class="mt-4 flex justify-center">
-            <a-button type="outline">
+            <a-button 
+              type="outline"
+              :disabled="!currentProduct || !selectedAnchor"
+              @click="saveCurrentSettings"
+            >
               保存当前设置
             </a-button>
           </div>
