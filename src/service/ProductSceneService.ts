@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid';
 export type ProductSceneRecord = {
     id?: string;
     scene_name: string;
@@ -21,7 +22,7 @@ export const ProductSceneService = {
 
     // 创建产品场景
     async create(record: ProductSceneRecord): Promise<string> {
-        const id = window.$mapi.uuid();
+        const id = uuidv4();
         const now = new Date().toISOString();
         
         await window.$mapi.db.execute(
