@@ -168,6 +168,26 @@ const versions = [
             )`);
             await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_product_scene_id
                     ON product_scene (id)`);
+            await db.execute(`CREATE TABLE IF NOT EXISTS product_script (
+                    id               VARCHAR(100) NOT NULL,
+                    script_type_id   VARCHAR(100),
+                    product_id       VARCHAR(100),
+                    text_content     VARCHAR(500),
+                    audio_content    VARCHAR(500),
+                    state            VARCHAR(100),
+                    create_date      TIMESTAMP,
+                    creator          VARCHAR(100),
+                    updater          VARCHAR(100),
+                    update_date      TIMESTAMP,
+                    gender           INTEGER,
+                    audio_url        VARCHAR(255),
+                    script_index     INTEGER,
+                    video_duration   VARCHAR(100),
+                    pay_url         VARCHAR(500),
+                    PRIMARY KEY (id)
+            )`);
+            await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_product_script_id 
+                    ON product_script (id)`);
 
             const userDataPath = app.getPath('userData');
             const anchorsPath = join(userDataPath, 'resources/images/anchors');

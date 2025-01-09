@@ -10,6 +10,7 @@ import LiveProductService, { LiveProductRecord } from '../../service/LiveProduct
 import ProductService, { ProductRecord } from '../../service/ProductService';
 import AnchorService, { AnchorRecord } from '../../service/AnchorService';
 import ProductSceneService, { ProductSceneRecord } from '../../service/ProductSceneService';
+import ProductScriptService from '../../service/ProductScriptService';
 
 const router = useRouter();
 const route = useRoute();
@@ -35,6 +36,7 @@ const liveRoom = ref<LiveBroadcastRecord | null>(null);
 const anchors = ref<AnchorRecord[]>([]);
 const selectedAnchor = ref<AnchorRecord | null>(null);
 const currentProductScene = ref<ProductSceneRecord | null>(null);
+const maxTextLength = 500;
 
 const tabs = [
   { key: '主播选择', icon: 'icon-user' },
@@ -383,6 +385,9 @@ const handleSelectProduct = async (product: ProductRecord) => {
   
   // 加载该产品关联的主播场景
   await loadProductScene(product.id!);
+  
+  // 加载产品关联的脚本列表
+  await loadProductScripts(product.id!);
 };
 
 // 加载产品场景
@@ -416,12 +421,13 @@ const saveCurrentSettings = async () => {
       await ProductSceneService.update(currentProductScene.value.id!, {
         anchor_id: selectedAnchor.value.id,
         anchor_url: selectedAnchor.value.anchor_backgroud,
+        scene_name: selectedAnchor.value.anchor_name,
         updater: 'system'
       });
     } else {
       // 创建新场景
       await ProductSceneService.create({
-        scene_name: `${currentProduct.value.product_name}_场景`,
+        scene_name: selectedAnchor.value.anchor_name,
         anchor_url: selectedAnchor.value.anchor_backgroud,
         anchor_id: selectedAnchor.value.id,
         product_id: currentProduct.value.id,
@@ -435,7 +441,6 @@ const saveCurrentSettings = async () => {
     Message.success('保存成功');
     await loadProductScene(currentProduct.value.id);
   } catch (error) {
-    console.error('保存设置失败:', error);
     Message.error('保存失败');
   }
 };
@@ -521,6 +526,59 @@ const getImagePath = (path: string) => {
 // 处理主播选择
 const handleAnchorSelect = (anchor: AnchorRecord) => {
   selectedAnchor.value = anchor;
+};
+
+// 计算剩余可输入字符数
+const remainingChars = computed(() => {
+  return maxTextLength - manualText.value.length;
+});
+
+// 添加台词到列表
+const addScript = async () => {
+  if (!currentProduct.value?.id) {
+    Message.warning('请先选择产品');
+    return;
+  }
+  
+  if (!manualText.value.trim()) {
+    Message.warning('请输入台词内容');
+    return;
+  }
+  
+  try {
+    await ProductScriptService.create({
+      script_type_id: 'manual',
+      product_id: currentProduct.value.id,
+      text_content: manualText.value,
+      audio_content: '',
+      gender: 0,
+      audio_url: '',
+      script_index: currentProduct.value.scripts.length,
+      video_duration: '',
+      pay_url: '',
+      creator: 'system',
+      updater: 'system'
+    });
+    
+    await loadProductScripts(currentProduct.value.id);
+    manualText.value = '';
+    Message.success('添加成功');
+  } catch (error) {
+    console.error('添加台词失败:', error);
+    Message.error('添加失败');
+  }
+};
+
+// 加载产品脚本列表
+const loadProductScripts = async (productId: string) => {
+  try {
+    const scripts = await ProductScriptService.listByProductId(productId);
+    if (currentProduct.value) {
+      currentProduct.value.scripts = scripts;
+    }
+  } catch (error) {
+    console.error('加载脚本列表失败:', error);
+  }
 };
 
 // 组件挂载时加载数据
@@ -735,9 +793,9 @@ onMounted(() => {
                       class="bg-white rounded-lg p-4 shadow"
                     >
                       <div class="flex items-center justify-between mb-4">
-                        <div>{{ script.content }}</div>
+                        <div>{{ script.text_content }}</div>
                         <div class="flex items-center gap-2">
-                          <a-tag>{{ script.type === 'manual' ? '文本' : 'AI' }}</a-tag>
+                          <a-tag>{{ script.script_type_id === 'manual' ? '文本' : 'AI' }}</a-tag>
                           <a-button size="mini">
                             <template #icon>
                               <icon-play />
@@ -747,7 +805,7 @@ onMounted(() => {
                         </div>
                       </div>
                       <div class="text-gray-400">
-                        AI解析: {{ script.type === 'ai' ? 1 : 0 }}
+                        AI解析: {{ script.script_type_id === 'ai' ? 1 : 0 }}
                       </div>
                     </div>
                   </template>
@@ -794,11 +852,19 @@ onMounted(() => {
                               v-model="manualText"
                               placeholder="在此输入您的台词"
                               :auto-size="{ minRows: 12, maxRows: 16 }"
+                              :maxLength="maxTextLength"
+                              :showWordLimit="true"
                               class="w-full"
                               style="min-height: 300px;"
                             />
-                            <div class="flex justify-end mt-4">
-                              <a-button type="primary" size="small" @click="addToList('manual')">
+                            <div class="mt-2 flex justify-between text-gray-400 text-sm">
+                              <span>剩余可输入字符数: {{ remainingChars }}</span>
+                              <a-button 
+                                type="primary"
+                                size="small"
+                                :disabled="!manualText.trim() || !currentProduct"
+                                @click="addScript"
+                              >
                                 添加到列表
                               </a-button>
                             </div>
