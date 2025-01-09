@@ -94,7 +94,7 @@ const versions = [
                     audio_live_on INTEGER,
                     PRIMARY KEY (id)
             )`);
-            await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_live_broadcast_room_id 
+            await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_live_broadcast_room_id
                     ON live_broadcast_room (id)`);
             await db.execute(`CREATE TABLE IF NOT EXISTS live_product (
                     id VARCHAR(100) NOT NULL,
@@ -109,7 +109,7 @@ const versions = [
                     script_index INTEGER,
                     PRIMARY KEY (id)
             )`);
-            await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_live_product_id 
+            await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_live_product_id
                     ON live_product (id)`);
             await db.execute(`CREATE TABLE IF NOT EXISTS product (
                     id VARCHAR(100) NOT NULL,
@@ -135,7 +135,7 @@ const versions = [
                     is_delete INTEGER,
                     PRIMARY KEY (id)
             )`);
-            await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_product_id 
+            await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_product_id
                     ON product (id)`);
             await db.execute(`CREATE TABLE IF NOT EXISTS anchor (
                     id               VARCHAR(100) NOT NULL,
@@ -148,12 +148,12 @@ const versions = [
                     update_date     TIMESTAMP,
                     PRIMARY KEY (id)
             )`);
-            await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_anchor_id 
+            await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_anchor_id
                     ON anchor (id)`);
-            
+
             const userDataPath = app.getPath('userData');
             const anchorsPath = join(userDataPath, 'resources/images/anchors');
-            
+
             const defaultAnchors = [
                 {
                     id: '1ffe203237f6472e9eb34929e7679a70',
@@ -197,11 +197,11 @@ const versions = [
                     updater: 'system'
                 }
             ];
-            
+
             const now = new Date().toISOString();
             for (const anchor of defaultAnchors) {
                 const result = await db.execute(
-                    'SELECT id FROM anchor WHERE id = ?',
+                    'SELECT id FROM anchors WHERE id = ?',
                     [anchor.id]
                 );
                 const exists = Array.isArray(result) && result.length > 0;

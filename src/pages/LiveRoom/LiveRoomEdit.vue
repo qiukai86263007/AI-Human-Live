@@ -8,6 +8,7 @@ import CreateProductDialog from '../../components/Product/CreateProductDialog.vu
 import LiveBroadcastService, { LiveBroadcastRecord } from '../../service/LiveBroadcastService';
 import LiveProductService, { LiveProductRecord } from '../../service/LiveProductService';
 import ProductService, { ProductRecord } from '../../service/ProductService';
+import AnchorService, { AnchorRecord } from '../../service/AnchorService';
 
 const router = useRouter();
 const route = useRoute();
@@ -30,6 +31,7 @@ const showPlatformDialog = ref(false);
 const showPlatformSettings = ref(false);
 const selectedPlatform = ref('');
 const liveRoom = ref<LiveBroadcastRecord | null>(null);
+const anchors = ref<AnchorRecord[]>([]);
 
 const tabs = [
   { key: '主播选择', icon: 'icon-user' },
@@ -38,23 +40,16 @@ const tabs = [
   { key: '商品讲解', icon: 'icon-shopping' }
 ];
 
-// 模拟主播数据
-const anchors = ref([
-  { id: 1, name: '主播名称1' },
-  { id: 2, name: '主播名称2' },
-  { id: 3, name: '主播名称3' },
-  { id: 4, name: '主播名称4' },
-  { id: 5, name: '主播名称5' },
-  { id: 6, name: '主播名称6' },
-  { id: 7, name: '主播名称7' },
-  { id: 8, name: '主播名称8' },
-]);
+// 获取主播列表
+const loadAnchors = async () => {
+  anchors.value = await AnchorService.list();
+};
 
 // 过滤后的主播列表
 const filteredAnchors = computed(() => {
   if (!searchText.value) return anchors.value;
   return anchors.value.filter(anchor => 
-    anchor.name.toLowerCase().includes(searchText.value.toLowerCase())
+    anchor.anchor_name.toLowerCase().includes(searchText.value.toLowerCase())
   );
 });
 
@@ -464,10 +459,17 @@ const loadLiveRoom = async () => {
   }
 };
 
+// 获取图片路径
+const getImagePath = (path: string) => {
+  if (!path) return '';
+  return `file://${path}`;
+};
+
 // 组件挂载时加载数据
 onMounted(() => {
   loadLiveRoom();
   loadProducts();
+  loadAnchors();
 });
 
 </script>
@@ -938,9 +940,12 @@ onMounted(() => {
           <div v-for="anchor in currentAnchors" 
                :key="anchor.id" 
                class="aspect-[3/4] rounded-lg overflow-hidden relative group">
-            <img src="" alt="" class="w-full h-full object-cover" />
+            <img :src="getImagePath(anchor.anchor_backgroud)" 
+                 :alt="anchor.anchor_name"
+                 class="w-full h-full object-cover" 
+            />
             <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 p-2">
-              <div class="text-sm">{{ anchor.name }}</div>
+              <div class="text-sm">{{ anchor.anchor_name }}</div>
             </div>
           </div>
         </div>
