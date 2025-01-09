@@ -37,6 +37,8 @@ const anchors = ref<AnchorRecord[]>([]);
 const selectedAnchor = ref<AnchorRecord | null>(null);
 const currentProductScene = ref<ProductSceneRecord | null>(null);
 const maxTextLength = 500;
+const selectedScripts = ref<string[]>([]); // 选中的台词ID列表
+const isScriptMultiSelect = ref(false); // 台词多选模式
 
 const tabs = [
   { key: '主播选择', icon: 'icon-user' },
@@ -83,12 +85,6 @@ const toggleEdit = async () => {
   }
 };
 
-// 处理搜索
-const handleSearch = (value: string) => {
-  searchText.value = value;
-  currentPage.value = 1; // 重置页码
-};
-
 // 添加到列表
 const addToList = (type: 'manual' | 'ai') => {
   if (!currentProduct.value) {
@@ -118,12 +114,6 @@ const addToList = (type: 'manual' | 'ai') => {
   }
   
   Message.success('添加成功');
-};
-
-// 处理脚本搜索
-const handleScriptSearch = (value: string) => {
-  scriptSearchText.value = value;
-  currentPage.value = 1; // 重置页码
 };
 
 // 生成AI内容
@@ -581,6 +571,76 @@ const loadProductScripts = async (productId: string) => {
   }
 };
 
+// 是否全选台词
+const isAllScriptsSelected = computed(() => {
+  return filteredScripts.value.length > 0 && 
+         selectedScripts.value.length === filteredScripts.value.length;
+});
+
+// 处理台词多选切换
+const handleScriptMultiSelect = (checked: boolean) => {
+  isScriptMultiSelect.value = checked;
+  if (!checked) {
+    selectedScripts.value = [];
+  }
+};
+
+// 处理台词选择
+const handleScriptSelect = (script: ProductScriptRecord) => {
+  if (!isScriptMultiSelect.value) return;
+  
+  const index = selectedScripts.value.indexOf(script.id!);
+  if (index > -1) {
+    selectedScripts.value.splice(index, 1);
+  } else {
+    selectedScripts.value.push(script.id!);
+  }
+};
+
+// 删除选中的台词
+const handleDeleteScripts = async () => {
+  if (!selectedScripts.value.length) return;
+  
+  try {
+    for (const scriptId of selectedScripts.value) {
+      await ProductScriptService.delete(scriptId);
+    }
+    
+    if (currentProduct.value) {
+      await loadProductScripts(currentProduct.value.id!);
+    }
+    
+    selectedScripts.value = [];
+    Message.success('删除成功');
+  } catch (error) {
+    console.error('删除台词失败:', error);
+    Message.error('删除失败');
+  }
+};
+
+// 处理台词搜索
+const handleScriptSearch = (value: string) => {
+  scriptSearchText.value = value;
+};
+
+// 处理台词全选
+const handleSelectAllScripts = (checked: boolean) => {
+  if (checked) {
+    selectedScripts.value = filteredScripts.value.map(script => script.id!);
+  } else {
+    selectedScripts.value = [];
+  }
+};
+
+// 过滤后的台词列表
+const filteredScripts = computed(() => {
+  if (!currentProduct.value?.scripts) return [];
+  if (!scriptSearchText.value) return currentProduct.value.scripts;
+  return currentProduct.value.scripts.filter(script => 
+    script.text_content.toLowerCase().includes(scriptSearchText.value.toLowerCase())
+  );
+});
+
 // 组件挂载时加载数据
 onMounted(() => {
   loadLiveRoom();
@@ -765,9 +825,26 @@ onMounted(() => {
               <div class="bg-white rounded-lg p-4 mb-4 shadow">
                 <!-- 操作按钮和搜索框 -->
                 <div class="flex items-center gap-2 mb-4">
-                  <a-checkbox>全选</a-checkbox>
-                  <a-checkbox>多选</a-checkbox>
-                  <a-button size="mini" status="danger">
+                  <a-checkbox
+                    :model-value="isAllScriptsSelected"
+                    :disabled="!currentProduct?.scripts.length"
+                    @change="handleSelectAllScripts"
+                  >
+                    全选
+                  </a-checkbox>
+                  <a-checkbox
+                    v-model="isScriptMultiSelect"
+                    :disabled="!currentProduct?.scripts.length"
+                    @change="handleScriptMultiSelect"
+                  >
+                    多选
+                  </a-checkbox>
+                  <a-button 
+                    size="mini" 
+                    status="danger"
+                    :disabled="!selectedScripts.length"
+                    @click="handleDeleteScripts"
+                  >
                     <template #icon>
                       <icon-delete />
                     </template>
@@ -786,15 +863,23 @@ onMounted(() => {
                 </div>
                 <!-- 台词列表 -->
                 <div class="grid grid-cols-2 gap-4">
-                  <template v-if="currentProduct?.scripts.length">
+                  <template v-if="filteredScripts.length">
                     <div 
-                      v-for="script in currentProduct.scripts" 
+                      v-for="script in filteredScripts"
                       :key="script.id" 
-                      class="bg-white rounded-lg p-4 shadow"
+                      class="bg-white rounded-lg p-4 shadow cursor-pointer h-[120px] flex flex-col"
+                      :class="{
+                        'ring-2 ring-blue-500': selectedScripts.includes(script.id!)
+                      }"
+                      @click="handleScriptSelect(script)"
                     >
                       <div class="flex items-center justify-between mb-4">
-                        <div>{{ script.text_content }}</div>
-                        <div class="flex items-center gap-2">
+                        <div class="flex-1 truncate" :title="script.text_content">
+                          {{ script.text_content.length > 20 
+                             ? script.text_content.slice(0, 20) + '...' 
+                             : script.text_content }}
+                        </div>
+                        <div class="flex items-center gap-2 ml-2 flex-shrink-0">
                           <a-tag>{{ script.script_type_id === 'manual' ? '文本' : 'AI' }}</a-tag>
                           <a-button size="mini">
                             <template #icon>
@@ -804,14 +889,14 @@ onMounted(() => {
                           </a-button>
                         </div>
                       </div>
-                      <div class="text-gray-400">
+                      <div class="text-gray-400 mt-auto">
                         AI解析: {{ script.script_type_id === 'ai' ? 1 : 0 }}
                       </div>
                     </div>
                   </template>
                   <template v-else>
                     <div class="col-span-2 text-center text-gray-400 py-8">
-                      暂无台词内容
+                      {{ currentProduct?.scripts.length ? '未找到匹配的台词' : '暂无台词内容' }}
                     </div>
                   </template>
                 </div>
