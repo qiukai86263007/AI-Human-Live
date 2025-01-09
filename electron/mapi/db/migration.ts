@@ -1,3 +1,6 @@
+import { app } from 'electron';
+import { join } from 'path';
+
 const versions = [
     {
         version: 0,
@@ -134,8 +137,96 @@ const versions = [
             )`);
             await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_product_id 
                     ON product (id)`);
+            await db.execute(`CREATE TABLE IF NOT EXISTS anchor (
+                    id               VARCHAR(100) NOT NULL,
+                    anchor_backgroud VARCHAR(500),
+                    anchor_name      VARCHAR(500),
+                    state           VARCHAR(100),
+                    create_date     TIMESTAMP,
+                    creator         VARCHAR(100),
+                    updater         VARCHAR(100),
+                    update_date     TIMESTAMP,
+                    PRIMARY KEY (id)
+            )`);
+            await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_anchor_id 
+                    ON anchor (id)`);
+            
+            const userDataPath = app.getPath('userData');
+            const anchorsPath = join(userDataPath, 'resources/images/anchors');
+            
+            const defaultAnchors = [
+                {
+                    id: '1ffe203237f6472e9eb34929e7679a70',
+                    anchor_name: '主播小美',
+                    anchor_backgroud: join(anchorsPath, '1ffe203237f6472e9eb34929e7679a70.png'),
+                    state: 'normal',
+                    creator: 'system',
+                    updater: 'system'
+                },
+                {
+                    id: '9d176328b70a4dfabdc988011425c76e',
+                    anchor_name: '主播小范',
+                    anchor_backgroud: join(anchorsPath, '9d176328b70a4dfabdc988011425c76e.png'),
+                    state: 'normal',
+                    creator: 'system',
+                    updater: 'system'
+                }
+                ,
+                {
+                    id: '9b2027be0be340c1870fca8ba999b53c',
+                    anchor_name: '主播小黄',
+                    anchor_backgroud: join(anchorsPath, '9b2027be0be340c1870fca8ba999b53c.png'),
+                    state: 'normal',
+                    creator: 'system',
+                    updater: 'system'
+                },
+                {
+                    id: 'c43827fcff4d44fa9c62f9853ea7a920',
+                    anchor_name: '主播小王',
+                    anchor_backgroud: join(anchorsPath, 'c43827fcff4d44fa9c62f9853ea7a920.png'),
+                    state: 'normal',
+                    creator: 'system',
+                    updater: 'system'
+                },
+                {
+                    id: '3890fbe4e71f45fc8568a2153dd5efe7',
+                    anchor_name: '主播小李',
+                    anchor_backgroud: join(anchorsPath, '3890fbe4e71f45fc8568a2153dd5efe7.png'),
+                    state: 'normal',
+                    creator: 'system',
+                    updater: 'system'
+                }
+            ];
+            
+            const now = new Date().toISOString();
+            for (const anchor of defaultAnchors) {
+                const result = await db.execute(
+                    'SELECT id FROM anchor WHERE id = ?',
+                    [anchor.id]
+                );
+                const exists = Array.isArray(result) && result.length > 0;
+                if (!exists) {
+                    await db.execute(`
+                        INSERT INTO anchor (
+                            id, anchor_name, state,
+                            anchor_backgroud,
+                            create_date, creator,
+                            update_date, updater
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    `, [
+                        anchor.id,
+                        anchor.anchor_name,
+                        anchor.state,
+                        anchor.anchor_backgroud,
+                        now,
+                        anchor.creator,
+                        now,
+                        anchor.updater
+                    ]);
+                }
+            }
         }
-    },
+    }
 ]
 
 export default {
