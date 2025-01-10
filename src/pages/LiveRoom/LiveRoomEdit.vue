@@ -12,6 +12,7 @@ import AnchorService, { AnchorRecord } from '../../service/AnchorService';
 import ProductSceneService, { ProductSceneRecord } from '../../service/ProductSceneService';
 import ProductScriptService, {ProductScriptRecord} from '../../service/ProductScriptService';
 import QAndAService, { QAndARecord } from '../../service/QAndAService';
+import QAndAConfigService, { QAndAConfigRecord } from '../../service/QAndAConfigService';
 
 const router = useRouter();
 const route = useRoute();
@@ -43,6 +44,7 @@ const isScriptMultiSelect = ref(false); // 台词多选模式
 const selectedScriptId = ref<string>(''); // 当前选中的台词ID
 const editingScript = ref<ProductScriptRecord | null>(null);
 const showEditScriptDialog = ref(false);
+const qaConfig = ref<QAndAConfigRecord | null>(null);
 
 const tabs = [
   { key: '主播选择', icon: 'icon-user' },
@@ -776,6 +778,64 @@ watch(() => currentProduct.value?.id, async (newId) => {
   }
 });
 
+// 加载问答配置
+const loadQAConfig = async () => {
+  if (!liveRoom.value?.id) return;
+  
+  try {
+    const config = await QAndAConfigService.getByLiveId(liveRoom.value.id);
+    if (config) {
+      qaConfig.value = config;
+      // 同步配置到界面
+      replyDelay.value = config.appoint_within_do_not_reply || 60;
+      replyMode.value = String(config.reply_way || 1);
+    } else {
+      // 创建新配置
+      const id = await QAndAConfigService.create({
+        live_id: liveRoom.value.id,
+        enable: 1,
+        reply_way: 1,
+        appoint_within_do_not_reply: 60,
+        creator: 'system'
+      });
+      qaConfig.value = await QAndAConfigService.get(id);
+    }
+  } catch (error) {
+    console.error('加载问答配置失败:', error);
+    Message.error('加载配置失败');
+  }
+};
+
+// 保存问答配置
+const saveQAConfig = async () => {
+  if (!qaConfig.value?.id || !liveRoom.value?.id) {
+    Message.warning('配置未初始化');
+    return;
+  }
+  
+  try {
+    await QAndAConfigService.update(qaConfig.value.id, {
+      live_id: liveRoom.value.id,
+      enable: 1,
+      reply_way: parseInt(replyMode.value),
+      appoint_within_do_not_reply: replyDelay.value,
+      updater: 'system'
+    });
+    
+    Message.success('保存成功');
+  } catch (error) {
+    console.error('保存问答配置失败:', error);
+    Message.error('保存失败');
+  }
+};
+
+// 保持直播间加载时的配置加载
+watch(() => liveRoom.value?.id, async (newId) => {
+  if (newId) {
+    await loadQAConfig();
+  }
+});
+
 // 组件挂载时加载数据
 onMounted(() => {
   loadLiveRoom();
@@ -1241,32 +1301,41 @@ onMounted(() => {
               <div class="bg-white rounded-lg p-4 shadow">
                 <div class="mb-4">回复源设置</div>
                 <div class="mb-4">
-                  <a-checkbox>关键词问答</a-checkbox>
+                  <a-checkbox
+                    :model-value="true"
+                    :disabled="true"
+                  >
+                    关键词问答
+                  </a-checkbox>
                 </div>
                 <div class="mb-4">
                   回复设置
-                  <div class="flex items-center gap-2 mt-2">
+                  <div class="flex items-center gap-4">
+                    <span class="w-20">回复设置:</span>
                     <a-input-number
                       v-model="replyDelay"
                       :min="0"
-                      :max="100"
-                      class="w-24"
+                      :max="3600"
+                      class="w-32"
                     />
-                    <span>秒内一次关键词不重复回复</span>
+                    <span>秒内不重复回复相同问题</span>
                   </div>
                 </div>
                 <div class="mb-4">
-                  选择回答方式
+                  回答方式
                   <div class="mt-2">
                     <a-radio-group v-model="replyMode">
-                      <a-radio value="1">弹幕</a-radio>
-                      <a-radio value="2">弹幕和助播</a-radio>
-                      <a-radio value="3">助播</a-radio>
+                      <a-radio value="0">弹幕</a-radio>
+                      <a-radio value="1">弹幕和助播</a-radio>
+                      <a-radio value="2">助播</a-radio>
                     </a-radio-group>
                   </div>
                 </div>
                 <div class="flex justify-end">
-                  <a-button type="primary">
+                  <a-button 
+                    type="primary"
+                    @click="saveQAConfig"
+                  >
                     保存当前设置
                   </a-button>
                 </div>
