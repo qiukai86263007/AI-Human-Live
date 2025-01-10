@@ -186,7 +186,7 @@ const versions = [
                     pay_url         VARCHAR(500),
                     PRIMARY KEY (id)
             )`);
-            await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_product_script_id 
+            await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_product_script_id
                     ON product_script (id)`);
             await db.execute(`CREATE TABLE IF NOT EXISTS q_and_a (
                             id VARCHAR(255) PRIMARY KEY NOT NULL,
@@ -201,6 +201,18 @@ const versions = [
                             updater VARCHAR(255),
                             update_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                         )`);
+            await db.execute(`CREATE TABLE IF NOT EXISTS q_and_a_config (
+                    id VARCHAR(255) PRIMARY KEY,
+                    live_id VARCHAR(255),
+                    enable INTEGER DEFAULT 1,
+                    reply_way INTEGER DEFAULT 1,
+                    appoint_within_do_not_reply INTEGER DEFAULT 0,
+                    state VARCHAR(255) DEFAULT 'normal',
+                    create_date TIMESTAMP,
+                    creator VARCHAR(255),
+                    updater VARCHAR(255),
+                    update_date TIMESTAMP
+            )`);
             const userDataPath = app.getPath('userData');
             const anchorsPath = join(userDataPath, 'resources/images/anchors');
 
@@ -251,13 +263,13 @@ const versions = [
             const now = new Date().toISOString();
             for (const anchor of defaultAnchors) {
                 const result = await db.execute(
-                    'SELECT id FROM anchors WHERE id = ?',
+                    'SELECT id FROM anchor WHERE id = ?',
                     [anchor.id]
                 );
                 const exists = Array.isArray(result) && result.length > 0;
                 if (!exists) {
                     await db.execute(`
-                        INSERT INTO anchor (
+                        INSERT OR IGNORE INTO anchor (
                             id, anchor_name, state,
                             anchor_backgroud,
                             create_date, creator,
