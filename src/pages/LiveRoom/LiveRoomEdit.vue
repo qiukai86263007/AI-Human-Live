@@ -10,7 +10,7 @@ import LiveProductService, { LiveProductRecord } from '../../service/LiveProduct
 import ProductService, { ProductRecord } from '../../service/ProductService';
 import AnchorService, { AnchorRecord } from '../../service/AnchorService';
 import ProductSceneService, { ProductSceneRecord } from '../../service/ProductSceneService';
-import ProductScriptService from '../../service/ProductScriptService';
+import ProductScriptService, {ProductScriptRecord} from '../../service/ProductScriptService';
 
 const router = useRouter();
 const route = useRoute();
@@ -40,6 +40,8 @@ const maxTextLength = 500;
 const selectedScripts = ref<string[]>([]); // 选中的台词ID列表
 const isScriptMultiSelect = ref(false); // 台词多选模式
 const selectedScriptId = ref<string>(''); // 当前选中的台词ID
+const editingScript = ref<ProductScriptRecord | null>(null);
+const showEditScriptDialog = ref(false);
 
 const tabs = [
   { key: '主播选择', icon: 'icon-user' },
@@ -633,7 +635,41 @@ const filteredScripts = computed(() => {
     script.text_content.toLowerCase().includes(scriptSearchText.value.toLowerCase())
   );
 });
+// 处理台词编辑
+const handleEditScript = async (script: ProductScriptRecord, event: Event) => {
+  event.stopPropagation();
+  const fullScript = await ProductScriptService.get(script.id!);
+  if (fullScript) {
+    editingScript.value = fullScript;
+    showEditScriptDialog.value = true;
+  } else {
+    Message.error('获取台词数据失败');
+  }
+};
 
+const handleCancelEdit = () => {
+  editingScript.value = null;
+  showEditScriptDialog.value = false;
+};
+
+const handleSaveScript = async () => {
+  if (!editingScript.value?.id) return;
+  try {
+    await ProductScriptService.update(editingScript.value.id, {
+      text_content: editingScript.value.text_content,
+      script_type_id: editingScript.value.script_type_id,
+      updater: 'current_user'
+    });
+    if (currentProduct.value) {
+      await loadProductScripts(currentProduct.value.id!);
+    }
+    handleCancelEdit();
+    Message.success('保存成功');
+  } catch (error) {
+    console.error('保存台词失败:', error);
+    Message.error('保存失败');
+  }
+};
 
 // 组件挂载时加载数据
 onMounted(() => {
@@ -873,6 +909,14 @@ onMounted(() => {
                         </div>
                         <div class="flex items-center gap-2 ml-2 flex-shrink-0">
                           <a-tag>{{ script.script_type_id === 'manual' ? '文本' : 'AI' }}</a-tag>
+                          <a-button 
+                            size="mini"
+                            @click="(e) => handleEditScript(script, e)"
+                          >
+                            <template #icon>
+                              <icon-edit />
+                            </template>
+                          </a-button>
                           <a-button size="mini">
                             <template #icon>
                               <icon-play />
@@ -1237,6 +1281,34 @@ onMounted(() => {
     ref="createProductDialog"
     @success="handleProductCreated"
   />
+  
+ <!-- 编辑台词对话框 -->
+ <a-modal
+    v-model:visible="showEditScriptDialog"
+    title="编辑台词"
+    :width="600"
+    @cancel="handleCancelEdit"
+  >
+    <div v-if="editingScript" style="padding: 16px;">
+      <a-form-item label="台词内容">
+        <a-textarea
+          v-model="editingScript.text_content"
+          placeholder="请输入台词内容"
+          :auto-size="{ minRows: 3, maxRows: 5 }"
+          :max-length="500"
+          show-word-limit
+          allow-clear
+        />
+      </a-form-item>
+      <a-form-item label="台词类型">
+        <a-tag>{{ editingScript.script_type_id === 'manual' ? '文本' : 'AI' }}</a-tag>
+      </a-form-item>
+    </div>
+    <template #footer>
+      <a-button @click="handleCancelEdit">取消</a-button>
+      <a-button type="primary" @click="handleSaveScript">保存</a-button>
+    </template>
+  </a-modal> 
 </template>
 
 <style scoped>
