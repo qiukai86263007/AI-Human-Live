@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { Message } from '@arco-design/web-vue';
 import PlatformSelector from './PlatformSelector.vue';
@@ -11,6 +11,7 @@ import ProductService, { ProductRecord } from '../../service/ProductService';
 import AnchorService, { AnchorRecord } from '../../service/AnchorService';
 import ProductSceneService, { ProductSceneRecord } from '../../service/ProductSceneService';
 import ProductScriptService, {ProductScriptRecord} from '../../service/ProductScriptService';
+import QAndAService, { QAndARecord } from '../../service/QAndAService';
 
 const router = useRouter();
 const route = useRoute();
@@ -132,29 +133,25 @@ const handleQuestionSearch = (value: string) => {
 };
 
 interface QA {
-  id: number;
+  id?: string;
   question: string;
   answer: string;
+  _categoryId?: string;
 }
 
 interface QuestionCategory {
-  id: number;
+  id: string;
   name: string;
   qas: QA[];
 }
 
 // 新增问题种类
-const addNewCategory = () => {
+const addNewCategory = async () => {
   if (!currentProduct.value) {
     Message.warning('请先选择产品');
     return;
   }
 
-  editingCategory.value = {
-    id: Date.now(),
-    name: '',
-    qas: []
-  };
   showEditCategoryDialog.value = true;
 };
 
@@ -208,47 +205,68 @@ const editQA = (categoryId: number, qa: QA) => {
 };
 
 // 删除Q&A
-const deleteQA = (categoryId: number, qaId: number) => {
+const deleteQA = async (categoryId: number, qaId: string) => {
   if (!currentProduct.value) return;
-
-  const category = currentProduct.value.questionCategories.find(c => c.id === categoryId);
-  if (category) {
-    category.qas = category.qas.filter(qa => qa.id !== qaId);
+  
+  try {
+    await QAndAService.delete(qaId);
+    await loadProductQAs(currentProduct.value.id);
+    Message.success('删除成功');
+  } catch (error) {
+    console.error('删除问答失败:', error);
+    Message.error('删除失败');
   }
 };
 
 // 保存编辑的Q&A
-const saveQA = () => {
+const saveQA = async () => {
   if (!currentProduct.value) return;
-
-  // 如果问题和答案都为空，则不保存
+  
   if (!editingQA.value.question.trim() || !editingQA.value.answer.trim()) {
+    Message.warning('问题和回答不能为空');
     showEditQADialog.value = false;
     editingQA.value = { id: 0, question: '', answer: '' };
     return;
   }
   
-  currentProduct.value.questionCategories = currentProduct.value.questionCategories.map(category => {
-    // 只在对应的分类中添加或更新Q&A
-    if (category.id === editingQA.value._categoryId) {
-      const qaIndex = category.qas.findIndex(qa => qa.id === editingQA.value?.id);
-      if (qaIndex !== -1) {
-        category.qas[qaIndex] = { ...editingQA.value };
-      } else {
-        // 如果找不到现有的QA，说明是新增
-        category.qas.push({ ...editingQA.value });
-      }
-    }
-    return category;
-  });
-  
-  showEditQADialog.value = false;
-  editingQA.value = { id: 0, question: '', answer: '' };
-  Message.success('保存成功');
+  try {
+    // 获取当前问题种类
+    const categoryId = editingQA.value._categoryId;
+    if (!categoryId) return;
+    
+    // 获取当前问题种类的数据
+    const category = await QAndAService.get(categoryId);
+    if (!category) return;
+    
+    // 准备新的问答数据
+    const like_problems = category.like_problems || [];
+    const replys = category.replys || [];
+    
+    // 添加新的问答
+    like_problems.push(editingQA.value.question);
+    replys.push(editingQA.value.answer);
+    
+    // 更新数据库
+    await QAndAService.update(categoryId, {
+      like_problems,
+      replys,
+      updater: 'current_user'
+    });
+    
+    // 重新加载问答列表
+    await loadProductQAs(currentProduct.value.id);
+    
+    showEditQADialog.value = false;
+    editingQA.value = { id: 0, question: '', answer: '' };
+    Message.success('保存成功');
+  } catch (error) {
+    console.error('保存问答失败:', error);
+    Message.error('保存失败');
+  }
 };
 
 // 保存编辑的问题种类
-const saveCategory = () => {
+const saveCategory = async () => {
   if (!currentProduct.value) return;
   
   if (!editingCategory.value.name.trim()) {
@@ -257,16 +275,23 @@ const saveCategory = () => {
     return;
   }
   
-  const index = currentProduct.value.questionCategories.findIndex(c => c.id === editingCategory.value?.id);
-  if (index !== -1) {
-    currentProduct.value.questionCategories[index] = { ...editingCategory.value };
-  } else {
-    // 如果找不到现有的种类，说明是新增
-    currentProduct.value.questionCategories.push({ ...editingCategory.value });
+  try {
+    // 创建新的问题种类
+    await QAndAService.createCategory(
+      currentProduct.value.id!,
+      editingCategory.value.name
+    );
+    
+    // 重新加载问答列表
+    await loadProductQAs(currentProduct.value.id!);
+    
+    showEditCategoryDialog.value = false;
+    editingCategory.value = { id: 0, name: '', qas: [] };
+    Message.success('创建成功');
+  } catch (error) {
+    console.error('创建问题种类失败:', error);
+    Message.error('创建失败');
   }
-  
-  showEditCategoryDialog.value = false;
-  editingCategory.value = { id: 0, name: '', qas: [] };
 };
 
 // 处理平台选择
@@ -670,6 +695,36 @@ const handleSaveScript = async () => {
     Message.error('保存失败');
   }
 };
+
+// 加载产品的问答列表
+const loadProductQAs = async (productId: string) => {
+  try {
+    const qas = await QAndAService.listByProduct(productId);
+    if (currentProduct.value) {
+      // 将数据库记录转换为界面所需的格式
+      currentProduct.value.questionCategories = qas.map(qa => ({
+        id: qa.id!,
+        name: qa.problem!,
+        qas: qa.like_problems!.map((q, index) => ({
+          id: `${qa.id}-${index}`,
+          question: q,
+          answer: qa.replys![index] || '',
+          _categoryId: qa.id
+        }))
+      }));
+    }
+  } catch (error) {
+    console.error('加载问答列表失败:', error);
+    Message.error('加载问答失败');
+  }
+};
+
+// 在产品切换时加载问答列表
+watch(() => currentProduct.value?.id, async (newId) => {
+  if (newId) {
+    await loadProductQAs(newId);
+  }
+});
 
 // 组件挂载时加载数据
 onMounted(() => {
