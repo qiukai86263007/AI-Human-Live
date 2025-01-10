@@ -39,6 +39,7 @@ const currentProductScene = ref<ProductSceneRecord | null>(null);
 const maxTextLength = 500;
 const selectedScripts = ref<string[]>([]); // 选中的台词ID列表
 const isScriptMultiSelect = ref(false); // 台词多选模式
+const selectedScriptId = ref<string>(''); // 当前选中的台词ID
 
 const tabs = [
   { key: '主播选择', icon: 'icon-user' },
@@ -587,30 +588,22 @@ const handleScriptMultiSelect = (checked: boolean) => {
 
 // 处理台词选择
 const handleScriptSelect = (script: ProductScriptRecord) => {
-  if (!isScriptMultiSelect.value) return;
-  
-  const index = selectedScripts.value.indexOf(script.id!);
-  if (index > -1) {
-    selectedScripts.value.splice(index, 1);
-  } else {
-    selectedScripts.value.push(script.id!);
-  }
+  selectedScriptId.value = selectedScriptId.value === script.id ? '' : script.id!;
 };
 
 // 删除选中的台词
-const handleDeleteScripts = async () => {
-  if (!selectedScripts.value.length) return;
+const handleDeleteScript = async () => {
+  if (!selectedScriptId.value) {
+    Message.warning('请先选择要删除的台词');
+    return;
+  }
   
   try {
-    for (const scriptId of selectedScripts.value) {
-      await ProductScriptService.delete(scriptId);
-    }
-    
+    await ProductScriptService.delete(selectedScriptId.value);
     if (currentProduct.value) {
       await loadProductScripts(currentProduct.value.id!);
     }
-    
-    selectedScripts.value = [];
+    selectedScriptId.value = ''; // 清空选中
     Message.success('删除成功');
   } catch (error) {
     console.error('删除台词失败:', error);
@@ -640,6 +633,7 @@ const filteredScripts = computed(() => {
     script.text_content.toLowerCase().includes(scriptSearchText.value.toLowerCase())
   );
 });
+
 
 // 组件挂载时加载数据
 onMounted(() => {
@@ -842,8 +836,8 @@ onMounted(() => {
                   <a-button 
                     size="mini" 
                     status="danger"
-                    :disabled="!selectedScripts.length"
-                    @click="handleDeleteScripts"
+                    :disabled="!selectedScriptId"
+                    @click="handleDeleteScript"
                   >
                     <template #icon>
                       <icon-delete />
@@ -868,9 +862,7 @@ onMounted(() => {
                       v-for="script in filteredScripts"
                       :key="script.id" 
                       class="bg-white rounded-lg p-4 shadow cursor-pointer h-[120px] flex flex-col"
-                      :class="{
-                        'ring-2 ring-blue-500': selectedScripts.includes(script.id!)
-                      }"
+                      :class="{'ring-2 ring-blue-500': selectedScriptId === script.id}"
                       @click="handleScriptSelect(script)"
                     >
                       <div class="flex items-center justify-between mb-4">
