@@ -188,7 +188,21 @@ const versions = [
             )`);
             await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_product_script_id 
                     ON product_script (id)`);
-
+            await db.execute(`
+                        CREATE TABLE IF NOT EXISTS q_and_a (
+                            id VARCHAR(255) PRIMARY KEY NOT NULL,
+                            product_id VARCHAR(255),
+                            enable INTEGER DEFAULT 1,
+                            problem TEXT,
+                            like_problems TEXT,
+                            replys TEXT,
+                            state VARCHAR(255) DEFAULT 'normal',
+                            create_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            creator VARCHAR(255),
+                            updater VARCHAR(255),
+                            update_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        );
+            `);
             const userDataPath = app.getPath('userData');
             const anchorsPath = join(userDataPath, 'resources/images/anchors');
 
