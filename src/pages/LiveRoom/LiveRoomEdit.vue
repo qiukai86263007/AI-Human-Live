@@ -165,7 +165,7 @@ const addQA = (categoryId: number) => {
   const category = currentProduct.value.questionCategories.find(c => c.id === categoryId);
   if (category) {
     editingQA.value = {
-      id: Date.now(),
+      id: 0,
       question: '',
       answer: ''
     };
@@ -193,7 +193,7 @@ const deleteCategory = (categoryId: number) => {
 };
 
 // 编辑Q&A
-const editQA = (categoryId: number, qa: QA) => {
+const editQA = (categoryId: string, qa: QA) => {
   if (!currentProduct.value) return;
 
   const category = currentProduct.value.questionCategories.find(c => c.id === categoryId);
@@ -205,11 +205,38 @@ const editQA = (categoryId: number, qa: QA) => {
 };
 
 // 删除Q&A
-const deleteQA = async (categoryId: number, qaId: string) => {
+const deleteQA = async (categoryId: string, qaId: string) => {
   if (!currentProduct.value) return;
-  
   try {
-    await QAndAService.delete(qaId);
+    // 获取问题种类数据
+    const category = await QAndAService.get(categoryId);
+    console.log('category', category);
+    if (!category) return;
+
+    // 从 qaId 中解析出索引 (格式为 "categoryId-index")
+    const index = parseInt(qaId.split('-').pop() || '');
+    console.log('index', index);
+    if (isNaN(index)) return;
+    console.log('qaId', qaId);
+    // 从数组中移除对应索引的问答对
+    const like_problems = Array.isArray(category.like_problems) 
+      ? category.like_problems 
+      : JSON.parse(category.like_problems as string || '[]');
+    const replys = Array.isArray(category.replys)
+      ? category.replys
+      : JSON.parse(category.replys as string || '[]');
+    console.log('like_problems', like_problems);
+    console.log('replys', replys);
+    like_problems.splice(index, 1);
+    replys.splice(index, 1);
+
+    // 更新数据库
+    await QAndAService.update(categoryId, {
+      like_problems,
+      replys,
+      updater: 'current_user'
+    });
+
     await loadProductQAs(currentProduct.value.id);
     Message.success('删除成功');
   } catch (error) {
@@ -230,30 +257,53 @@ const saveQA = async () => {
   }
   
   try {
-    // 获取当前问题种类
     const categoryId = editingQA.value._categoryId;
     if (!categoryId) return;
     
-    // 获取当前问题种类的数据
     const category = await QAndAService.get(categoryId);
     if (!category) return;
+    console.log('editingQA.value.id', editingQA.value.id);
+    // 如果是编辑现有问答
+    if (editingQA.value.id) {
+      
+      const index = parseInt(editingQA.value.id.split('-').pop() || '');
+      if (!isNaN(index)) {
+        const like_problems = Array.isArray(category.like_problems)
+          ? category.like_problems
+          : JSON.parse(category.like_problems as string || '[]');
+        const replys = Array.isArray(category.replys)
+          ? category.replys
+          : JSON.parse(category.replys as string || '[]');
+          
+        // 更新对应索引的问答
+        like_problems[index] = editingQA.value.question;
+        replys[index] = editingQA.value.answer;
+        
+        await QAndAService.update(categoryId, {
+          like_problems,
+          replys,
+          updater: 'current_user'
+        });
+      }
+    } else {
+      // 添加新问答
+      const like_problems = Array.isArray(category.like_problems)
+        ? category.like_problems
+        : JSON.parse(category.like_problems as string || '[]');
+      const replys = Array.isArray(category.replys)
+        ? category.replys
+        : JSON.parse(category.replys as string || '[]');
+      
+      like_problems.push(editingQA.value.question);
+      replys.push(editingQA.value.answer);
+      
+      await QAndAService.update(categoryId, {
+        like_problems,
+        replys,
+        updater: 'current_user'
+      });
+    }
     
-    // 准备新的问答数据
-    const like_problems = category.like_problems || [];
-    const replys = category.replys || [];
-    
-    // 添加新的问答
-    like_problems.push(editingQA.value.question);
-    replys.push(editingQA.value.answer);
-    
-    // 更新数据库
-    await QAndAService.update(categoryId, {
-      like_problems,
-      replys,
-      updater: 'current_user'
-    });
-    
-    // 重新加载问答列表
     await loadProductQAs(currentProduct.value.id);
     
     showEditQADialog.value = false;
