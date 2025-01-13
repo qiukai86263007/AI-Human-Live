@@ -194,16 +194,17 @@
                   <a-tab-pane key="分享引导" title="分享引导" />
                 </a-tabs>
                 
+                <!-- 添加条件按钮 -->
+                <div class="flex mb-4">
+                  <a-button type="primary" @click="addGiftGuide">
+                    <template #icon>
+                      <icon-plus />
+                    </template>
+                    添加引导
+                  </a-button>
+                </div>
                 <!-- 引导内容列表 -->
                 <div>
-                  <div class="flex mb-4">
-                    <a-button type="primary" @click="addGuide">
-                      <template #icon>
-                        <icon-plus />
-                      </template>
-                      添加引导
-                    </a-button>
-                  </div>
                   <div class="rounded-lg p-4 h-[400px] overflow-y-auto">
                     <template v-if="getGuideList(currentGuideType).length">
                       <div v-for="guide in getGuideList(currentGuideType)" 
@@ -213,12 +214,12 @@
                         <div class="flex items-center justify-between">
                           <div>{{ guide.content }}</div>
                           <div class="flex items-center gap-2">
-                            <a-button type="text" size="mini" @click="editGuide(guide)">
+                            <a-button type="text" size="mini" @click="editGiftGuide(guide)">
                               <template #icon>
                                 <icon-edit />
                               </template>
                             </a-button>
-                            <a-button type="text" size="mini" status="danger" @click="deleteGuide(guide.id)">
+                            <a-button type="text" size="mini" status="danger" @click="deleteGiftGuide(guide.id)">
                               <template #icon>
                                 <icon-delete />
                               </template>
@@ -419,10 +420,10 @@
                 <!-- 礼物互动方式 -->
                 <div class="mb-4">
                   <div class="mb-2">感谢方式</div>
-                  <a-radio-group v-model="giftSettings.replyMode">
-                    <a-radio value="danmu">弹幕</a-radio>
-                    <a-radio value="assistant">助播</a-radio>
-                    <a-radio value="both">弹幕和助播</a-radio>
+                  <a-radio-group v-model="giftSettings.replyWay">
+                    <a-radio :value="0">弹幕</a-radio>
+                    <a-radio :value="2">助播</a-radio>
+                    <a-radio :value="1">弹幕和助播</a-radio>
                   </a-radio-group>
                 </div>
                 
@@ -432,15 +433,15 @@
                   <div class="space-y-3">
                     <a-radio-group v-model="giftSettings.thankRule">
                       <div class="flex flex-col gap-2">
-                        <a-radio value="all">不管礼物数量还是大小，全部感谢</a-radio>
-                        <a-radio value="threshold">
+                        <a-radio :value="1">不管礼物数量还是大小，全部感谢</a-radio>
+                        <a-radio :value="0">
                           <div class="flex items-center gap-2">
                             <span>只感谢礼物单次金额大于</span>
                             <a-input-number
-                              v-model="giftSettings.minThreshold"
+                              v-model="giftSettings.giftMoney"
                               :min="0"
                               class="w-20"
-                              :disabled="giftSettings.thankRule !== 'threshold'"
+                              :disabled="giftSettings.thankRule != 0"
                             />
                             <span>抖币的礼物</span>
                           </div>
@@ -456,7 +457,7 @@
                   <div class="flex items-center gap-2">
                     <span class="whitespace-nowrap">  小于</span>
                     <a-input-number
-                      v-model="giftSettings.giftThreshold"
+                      v-model="giftSettings.smallAmountMoney"
                       :min="0"
                       class="w-24"
                     />
@@ -469,14 +470,14 @@
               <div class="flex-grow">
                 <div class="mb-4 text-lg font-medium">引导内容设置</div>
                 <!-- 引导类型选项卡 -->
-                <a-tabs v-model:activeKey="currentGiftType" @change="handleGiftTabChange">
+                <a-tabs v-model:activeKey="currentGuideType" @change="handleGiftTabChange">
                   <a-tab-pane key="小额礼物感谢" title="小额礼物感谢" />
                   <a-tab-pane key="大额礼物感谢" title="大额礼物感谢" />
                 </a-tabs>
                 
                 <!-- 添加条件按钮 -->
                 <div class="flex mb-4">
-                  <a-button type="primary">
+                  <a-button type="primary" @click="addGiftGuide">
                     <template #icon>
                       <icon-plus />
                     </template>
@@ -486,20 +487,20 @@
                 <!-- 引导内容列表 -->
                 <div>
                   <div class="rounded-lg p-4 h-[400px] overflow-y-auto">
-                    <template v-if="getGuideList(currentGiftType).length">
-                      <div v-for="guide in getGuideList(currentGiftType)" 
+                    <template v-if="getGuideList(currentGuideType).length">
+                      <div v-for="guide in getGuideList(currentGuideType)" 
                            :key="guide.id"
                            class="border border-gray-600 rounded-lg p-4 mb-3 last:mb-0"
                       >
                         <div class="flex items-center justify-between">
                           <div>{{ guide.content }}</div>
                           <div class="flex items-center gap-2">
-                            <a-button type="text" size="mini">
+                            <a-button type="text" size="mini" @click="editGiftGuide(guide)">
                               <template #icon>
                                 <icon-edit />
                               </template>
                             </a-button>
-                            <a-button type="text" size="mini" status="danger">
+                            <a-button type="text" size="mini" status="danger" @click="deleteGiftGuide(guide.id)">
                               <template #icon>
                                 <icon-delete />
                               </template>
@@ -520,7 +521,7 @@
             
             <!-- 底部面板 -->
             <div class="flex justify-end items-center h-16 mt-4 pt-4 border-t border-gray-200">
-              <a-button type="primary">
+              <a-button type="primary" @click="saveGiftSettings">
                 保存当前设置
               </a-button>
             </div>
@@ -577,6 +578,7 @@ import OverallSituationConfigService, { OverallSituationConfigRecord } from '../
 import RegularInteractionConfigService from '../../service/RegularInteractionConfigService';
 import LikeConfigService from '../../service/LikeConfigService';
 import OnLineNumberConfigService from '../../service/OnLineNumberConfigService';
+import GiftThankConfigService from '../../service/GiftThankConfigService';
 
 interface Settings {
   runMode: number;
@@ -927,7 +929,13 @@ const deleteGuide = (guideId: number) => {
 
 // 获取当前类型的引导列表
 const getGuideList = (type: string) => {
-  return guideList.value[type] || [];
+  const typeMap = {
+    '小额礼物感谢': 'small',
+    '大额礼物感谢': 'large',
+    '强化感谢': 'strengthen'
+  };
+  const key = typeMap[type];
+  return key ? giftSettings.rules[key] : [];
 };
 
 // 监听选项卡变化
@@ -1028,32 +1036,128 @@ const addOnlineRule = () => {
   showRuleDialog.value = true;
 };
 
+// 礼物感谢默认配置
+const defaultGiftSettings = {
+  enable: 1,
+  replyWay: 1,      // 0=弹幕, 1=弹幕和助播, 2=助播
+  thankRule: 0,     // 感谢规则：0=全部感谢，1=阈值感谢
+  giftMoney: 100,   // 礼物金额阈值（抖币）(gift_money)
+  smallAmountMoney: 500, // 小额礼物阈值（抖币）(small_amount_money)
+  strengthenThankEnable: 1,
+  rules: {
+    small: [],      // 小额感谢内容
+    large: [],      // 大额感谢内容
+    strengthen: []  // 强化感谢内容
+  }
+};
+
 // 礼物感谢设置
 const giftSettings = reactive({
-  replyMode: 'danmu',      // 礼物互动方式
-  thankRule: 'all',       // 感谢规则：all-全部感谢，threshold-阈值感谢
-  minThreshold: 100,      // 最小感谢阈值（抖币）
-  giftThreshold: 500,     // 礼物等级阈值（抖币）
-  probabilities: {        // 各类型引导概率
-    small: 50,           // 小额礼物感谢概率
-    large: 50,           // 大额礼物感谢概率
-  },
-  sendMode: 'sequence'    // 发送方式
+  enable: 1,
+  replyWay: 1 as number,
+  thankRule: 0 as number,
+  giftMoney: 100,
+  smallAmountMoney: 500,
+  strengthenThankEnable: 1,
+  rules: {
+    small: [] as Array<{ id: number; content: string }>,
+    large: [] as Array<{ id: number; content: string }>,
+    strengthen: [] as Array<{ id: number; content: string }>
+  }
 });
 
-// 当前选中的礼物引导类型
-const currentGiftType = ref('小额礼物感谢');
-
-// 引导内容列表
-const giftGuideList = reactive({
-  '小额礼物感谢': [],
-  '大额礼物感谢': []
-});
-
-// 监听礼物引导选项卡变化
-const handleGiftTabChange = (key: string) => {
-  currentGiftType.value = key;
+// 加载礼物感谢配置
+const loadGiftSettings = async () => {
+  if (!props.liveId) return;
+  
+  try {
+    const config = await GiftThankConfigService.getByLiveId(props.liveId);
+    // 先设置默认值
+    Object.assign(giftSettings, structuredClone(defaultGiftSettings));
+    
+    if (config) {
+      giftSettings.enable = config.enable ?? defaultGiftSettings.enable;
+      giftSettings.replyWay = config.reply_way ?? defaultGiftSettings.replyWay;
+      giftSettings.thankRule = config.thank_rule ?? defaultGiftSettings.thankRule;
+      giftSettings.giftMoney = config.gift_money ?? defaultGiftSettings.giftMoney;
+      giftSettings.smallAmountMoney = config.small_amount_money ?? defaultGiftSettings.smallAmountMoney;
+      giftSettings.strengthenThankEnable = config.strengthen_thank_enable ?? 1;
+      giftSettings.rules = {
+        small: config.small_amount_thank_contents ? JSON.parse(config.small_amount_thank_contents) : [],
+        large: config.big_amount_thank_contents ? JSON.parse(config.big_amount_thank_contents) : [],
+        strengthen: config.strengthen_thankcontents ? JSON.parse(config.strengthen_thankcontents) : []
+      };
+    }
+  } catch (error) {
+    console.error('加载礼物感谢配置失败:', error);
+    Message.error('加载配置失败');
+    Object.assign(giftSettings, structuredClone(defaultGiftSettings));
+  }
 };
+
+// 保存礼物感谢配置
+const saveGiftSettings = async () => {
+  if (!props.liveId) {
+    Message.warning('直播间ID未设置');
+    return;
+  }
+  
+  try {
+    const config = await GiftThankConfigService.getByLiveId(props.liveId);
+    if (config?.id) {
+      await GiftThankConfigService.update(config.id, {
+        enable: giftSettings.enable,
+        reply_way: giftSettings.replyWay,
+        thank_rule: giftSettings.thankRule,
+        gift_money: giftSettings.giftMoney,
+        small_amount_money: giftSettings.smallAmountMoney,
+        small_amount_thank_contents: JSON.stringify(giftSettings.rules.small),
+        big_amount_thank_contents: JSON.stringify(giftSettings.rules.large),
+        strengthen_thankcontents: JSON.stringify(giftSettings.rules.strengthen),
+        strengthen_thank_enable: giftSettings.strengthenThankEnable,
+        platform: props.platform,
+        updater: 'system'
+      });
+    } else {
+      await GiftThankConfigService.create({
+        live_id: props.liveId,
+        platform: props.platform,
+        enable: giftSettings.enable,
+        reply_way: giftSettings.replyWay,
+        thank_rule: giftSettings.thankRule,
+        gift_money: giftSettings.giftMoney,
+        small_amount_money: giftSettings.smallAmountMoney,
+        small_amount_thank_contents: JSON.stringify(giftSettings.rules.small),
+        big_amount_thank_contents: JSON.stringify(giftSettings.rules.large),
+        strengthen_thankcontents: JSON.stringify(giftSettings.rules.strengthen),
+        strengthen_thank_enable: giftSettings.strengthenThankEnable,
+        creator: 'system'
+      });
+    }
+    Message.success('保存成功');
+  } catch (error) {
+    console.error('保存礼物感谢配置失败:', error);
+    Message.error('保存失败');
+  }
+};
+
+// 监听visible变化
+watch(() => props.visible, (val) => {
+  modalVisible.value = val;
+  if (val) {
+    loadGlobalSettings();
+    loadTimingSettings();
+    loadPopularitySettings();
+    loadGiftSettings();
+  }
+});
+
+// 编辑规则对话框状态
+const showRuleDialog = ref(false);
+// 当前编辑的规则
+const editingRule = ref<{ id: number; count: number; content: string }>({ id: 0, count: 0, content: '' });
+// 当前编辑的规则类型
+const currentRuleType = ref<'like' | 'online'>('like');
 
 // 编辑对话框显示状态
 const showEditGuideDialog = ref(false);
@@ -1063,16 +1167,25 @@ const editingGuide = ref<{ id: number; content: string }>({ id: 0, content: '' }
 
 // 添加确认编辑方法
 const handleEditGuideConfirm = () => {
-  const list = guideList.value[currentGuideType.value];
+  const typeMap = {
+    '小额礼物感谢': 'small',
+    '大额礼物感谢': 'large',
+    '强化感谢': 'strengthen'
+  };
+  const type = typeMap[currentGuideType.value];
+  if (!type) return;
+  
+  const list = giftSettings.rules[type];
   const index = list.findIndex(item => item.id === editingGuide.value.id);
   
   if (index > -1) {
-    // 更新已存在的引导内容
     list[index] = { ...editingGuide.value };
   } else {
-    // 添加新的引导内容
     list.push({ ...editingGuide.value });
   }
+  
+  // 强制更新视图
+  giftSettings.rules[type] = [...list];
   
   showEditGuideDialog.value = false;
 };
@@ -1093,7 +1206,6 @@ const loadPopularitySettings = async () => {
           structuredClone(defaultPopularitySettings.like.rules)
       };
     } else {
-      // 使用默认配置
       popularitySettings.like = structuredClone(defaultPopularitySettings.like);
     }
     
@@ -1108,7 +1220,6 @@ const loadPopularitySettings = async () => {
           structuredClone(defaultPopularitySettings.online.rules)
       };
     } else {
-      // 使用默认配置
       popularitySettings.online = structuredClone(defaultPopularitySettings.online);
     }
   } catch (error) {
@@ -1118,81 +1229,28 @@ const loadPopularitySettings = async () => {
   }
 };
 
-// 保存人气互动配置
-const savePopularitySettings = async () => {
-  if (!props.liveId) {
-    Message.warning('直播间ID未设置');
-    return;
-  }
-  
-  try {
-    // 保存点赞配置
-    const likeConfig = await LikeConfigService.getByLiveId(props.liveId);
-    if (likeConfig?.id) {
-      await LikeConfigService.update(likeConfig.id, {
-        enable: popularitySettings.like.enable,
-        reply_way: popularitySettings.like.replyWay,
-        like_parameters: JSON.stringify(popularitySettings.like.rules),
-        platform: props.platform,
-        updater: 'system'
-      });
-    } else {
-      // 创建新的点赞配置
-      await LikeConfigService.create({
-        live_id: props.liveId,
-        platform: props.platform,
-        enable: popularitySettings.like.enable,
-        reply_way: popularitySettings.like.replyWay,
-        like_parameters: JSON.stringify(popularitySettings.like.rules),
-        creator: 'system'
-      });
-    }
-    
-    // 保存在线人数配置
-    const onlineConfig = await OnLineNumberConfigService.getByLiveId(props.liveId);
-    if (onlineConfig?.id) {
-      await OnLineNumberConfigService.update(onlineConfig.id, {
-        enable: popularitySettings.online.enable,
-        reply_way: popularitySettings.online.replyWay,
-        onLine_number_parameters: JSON.stringify(popularitySettings.online.rules),
-        platform: props.platform,
-        updater: 'system'
-      });
-    } else {
-      // 创建新的在线人数配置
-      await OnLineNumberConfigService.create({
-        live_id: props.liveId,
-        platform: props.platform,
-        enable: popularitySettings.online.enable,
-        reply_way: popularitySettings.online.replyWay,
-        onLine_number_parameters: JSON.stringify(popularitySettings.online.rules),
-        creator: 'system'
-      });
-    }
-    
-    Message.success('保存成功');
-  } catch (error) {
-    console.error('保存人气互动配置失败:', error);
-    Message.error('保存失败');
-  }
+// 添加礼物感谢引导
+const addGiftGuide = () => {
+  editingGuide.value = { id: Date.now(), content: '' };
+  showEditGuideDialog.value = true;
 };
 
-// 监听visible变化
-watch(() => props.visible, (val) => {
-  modalVisible.value = val;
-  if (val) {
-    loadGlobalSettings();
-    loadTimingSettings();
-    loadPopularitySettings();
-  }
-});
+// 编辑礼物感谢引导
+const editGiftGuide = (guide: { id: number; content: string }) => {
+  editingGuide.value = { ...guide };
+  showEditGuideDialog.value = true;
+};
 
-// 编辑规则对话框状态
-const showRuleDialog = ref(false);
-// 当前编辑的规则
-const editingRule = ref<{ id: number; count: number; content: string }>({ id: 0, count: 0, content: '' });
-// 当前编辑的规则类型
-const currentRuleType = ref<'like' | 'online'>('like');
+// 删除礼物感谢引导
+const deleteGiftGuide = (guideId: number) => {
+  const type = currentGuideType.value === '小额礼物感谢' ? 'small' : 
+               currentGuideType.value === '大额礼物感谢' ? 'large' : 'strengthen';
+  const list = giftSettings.rules[type];
+  const index = list.findIndex(item => item.id === guideId);
+  if (index > -1) {
+    list.splice(index, 1);
+  }
+};
 </script>
 
 <style scoped>

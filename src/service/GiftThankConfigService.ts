@@ -41,12 +41,12 @@ class GiftThankConfigService {
       data.enable || 1,
       data.reply_way || 1,
       data.thank_rule || 0,
-      data.gift_money || 0,
-      data.small_amount_money || 0,
-      data.small_amount_thank_contents || '',
-      data.big_amount_thank_contents || '',
-      data.strengthen_thankcontents || '',
-      data.strengthen_thank_enable || 0,
+      data.gift_money || 100,
+      data.small_amount_money || 500,
+      data.small_amount_thank_contents || '[]',
+      data.big_amount_thank_contents || '[]',
+      data.strengthen_thankcontents || '[]',
+      data.strengthen_thank_enable || 1,
       data.state || 'normal',
       now,
       data.creator || 'system',
@@ -79,19 +79,9 @@ class GiftThankConfigService {
     await window.$mapi.db.execute(sql, params);
   }
 
-  async get(id: string): Promise<GiftThankConfigRecord | null> {
-    const sql = `SELECT * FROM ${this.tableName} WHERE id = ?`;
-    return await window.$mapi.db.first(sql, [id]);
-  }
-
   async getByLiveId(liveId: string): Promise<GiftThankConfigRecord | null> {
     const sql = `SELECT * FROM ${this.tableName} WHERE live_id = ? AND state = 'normal'`;
     return await window.$mapi.db.first(sql, [liveId]);
-  }
-
-  async list(): Promise<GiftThankConfigRecord[]> {
-    const sql = `SELECT * FROM ${this.tableName} WHERE state = 'normal' ORDER BY create_date DESC`;
-    return await window.$mapi.db.select(sql);
   }
 }
 
