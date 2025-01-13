@@ -62,7 +62,7 @@ const loadAnchors = async () => {
 // 过滤后的主播列表
 const filteredAnchors = computed(() => {
   if (!searchText.value) return anchors.value;
-  return anchors.value.filter(anchor => 
+  return anchors.value.filter(anchor =>
     anchor.anchor_name.toLowerCase().includes(searchText.value.toLowerCase())
   );
 });
@@ -119,7 +119,7 @@ const addToList = (type: 'manual' | 'ai') => {
     aiGeneratedText.value = '';
     aiKeyword.value = '';
   }
-  
+
   Message.success('添加成功');
 };
 
@@ -222,8 +222,8 @@ const deleteQA = async (categoryId: string, qaId: string) => {
     if (isNaN(index)) return;
     console.log('qaId', qaId);
     // 从数组中移除对应索引的问答对
-    const like_problems = Array.isArray(category.like_problems) 
-      ? category.like_problems 
+    const like_problems = Array.isArray(category.like_problems)
+      ? category.like_problems
       : JSON.parse(category.like_problems as string || '[]');
     const replys = Array.isArray(category.replys)
       ? category.replys
@@ -248,27 +248,66 @@ const deleteQA = async (categoryId: string, qaId: string) => {
   }
 };
 
+  // 添加计算属性判断是否显示开始直播按钮
+  const showStartLiveButton = computed(() => {
+    return liveRoom.value?.state === 'created' || liveRoom.value?.state === 'live';
+  });
+
+  const isLiveButtonText = computed(() => {
+    return liveRoom.value?.state === 'created' ? '开始直播' : '停止直播';
+  });
+
+  const canEditAISettings = computed(() => {
+    return liveRoom.value?.state === 'created';
+  });
+// 添加开始直播方法
+const handleStartLive = async () => {
+  const liveId = route.query.id as string;
+  if (!liveId) {
+    Message.warning('直播间ID未设置');
+    return;
+  }
+
+  try {
+    const newState = liveRoom.value?.state === 'created' ? 'live' : 'created';
+    const actionText = newState === 'live' ? '启动' : '停止';
+    
+    Message.loading(`正在${actionText}直播...`);
+    await LiveBroadcastService.update(liveId, {
+      state: newState,
+      update_date: new Date().toISOString(),
+      updater: 'current_user'
+    });
+
+    await loadLiveRoom(); // 重新加载直播间信息
+    Message.success(`直播已${actionText}`);
+  } catch (error) {
+    console.error('启动直播失败:', error);
+    Message.error('启动直播失败');
+  }
+};
+
 // 保存编辑的Q&A
 const saveQA = async () => {
   if (!currentProduct.value) return;
-  
+
   if (!editingQA.value.question.trim() || !editingQA.value.answer.trim()) {
     Message.warning('问题和回答不能为空');
     showEditQADialog.value = false;
     editingQA.value = { id: 0, question: '', answer: '' };
     return;
   }
-  
+
   try {
     const categoryId = editingQA.value._categoryId;
     if (!categoryId) return;
-    
+
     const category = await QAndAService.get(categoryId);
     if (!category) return;
     console.log('editingQA.value.id', editingQA.value.id);
     // 如果是编辑现有问答
     if (editingQA.value.id) {
-      
+
       const index = parseInt(editingQA.value.id.split('-').pop() || '');
       if (!isNaN(index)) {
         const like_problems = Array.isArray(category.like_problems)
@@ -277,11 +316,11 @@ const saveQA = async () => {
         const replys = Array.isArray(category.replys)
           ? category.replys
           : JSON.parse(category.replys as string || '[]');
-          
+
         // 更新对应索引的问答
         like_problems[index] = editingQA.value.question;
         replys[index] = editingQA.value.answer;
-        
+
         await QAndAService.update(categoryId, {
           like_problems,
           replys,
@@ -296,19 +335,19 @@ const saveQA = async () => {
       const replys = Array.isArray(category.replys)
         ? category.replys
         : JSON.parse(category.replys as string || '[]');
-      
+
       like_problems.push(editingQA.value.question);
       replys.push(editingQA.value.answer);
-      
+
       await QAndAService.update(categoryId, {
         like_problems,
         replys,
         updater: 'current_user'
       });
     }
-    
+
     await loadProductQAs(currentProduct.value.id);
-    
+
     showEditQADialog.value = false;
     editingQA.value = { id: 0, question: '', answer: '' };
     Message.success('保存成功');
@@ -321,23 +360,23 @@ const saveQA = async () => {
 // 保存编辑的问题种类
 const saveCategory = async () => {
   if (!currentProduct.value) return;
-  
+
   if (!editingCategory.value.name.trim()) {
     showEditCategoryDialog.value = false;
     editingCategory.value = { id: 0, name: '', qas: [] };
     return;
   }
-  
+
   try {
     // 创建新的问题种类
     await QAndAService.createCategory(
       currentProduct.value.id!,
       editingCategory.value.name
     );
-    
+
     // 重新加载问答列表
     await loadProductQAs(currentProduct.value.id!);
-    
+
     showEditCategoryDialog.value = false;
     editingCategory.value = { id: 0, name: '', qas: [] };
     Message.success('创建成功');
@@ -385,7 +424,7 @@ const isAllSelected = computed(() => {
 const loadProducts = async () => {
   const id = route.query.id as string;
   if (!id) return;
-  
+
   try {
     productList.value = await LiveProductService.listByLiveId(id);
   } catch (error) {
@@ -436,11 +475,11 @@ const handleSelectProduct = async (product: ProductRecord) => {
     }
     return;
   }
-  
+
   // 重置主播选择
   selectedAnchor.value = null;
   currentProductScene.value = null;
-  
+
   currentProduct.value = {
     ...product,
     live_id: route.query.id as string,
@@ -450,13 +489,13 @@ const handleSelectProduct = async (product: ProductRecord) => {
     questionCategories: [],
     currentTab: currentTab.value
   } as ProductExtend;
-  
+
   currentTab.value = '主播选择';
   selectedProducts.value = [product.id!];
-  
+
   // 加载该产品关联的主播场景
   await loadProductScene(product.id!);
-  
+
   // 加载产品关联的脚本列表
   await loadProductScripts(product.id!);
 };
@@ -537,7 +576,7 @@ const handleMultiSelect = (checked: boolean) => {
 // 处理删除
 const handleDelete = async () => {
   if (selectedProducts.value.length === 0) return;
-  
+
   try {
     // 如果当前选中的产品被删除，清空currentProduct
     if (currentProduct.value && selectedProducts.value.includes(currentProduct.value.id!)) {
@@ -549,7 +588,7 @@ const handleDelete = async () => {
     const toDelete = liveProducts.filter(lp => {
       return selectedProducts.value.includes(lp.id!);
     });
-    
+
     for (const liveProduct of toDelete) {
       await ProductService.delete({ id: liveProduct.product_id });
       await LiveProductService.delete(liveProduct);
@@ -577,7 +616,7 @@ const handleTabChange = (tab: string) => {
 const loadLiveRoom = async () => {
   const id = route.query.id as string;
   if (!id) return;
-  
+
   try {
     liveRoom.value = await LiveBroadcastService.get(id);
     if (liveRoom.value) {
@@ -610,12 +649,12 @@ const addScript = async () => {
     Message.warning('请先选择产品');
     return;
   }
-  
+
   if (!manualText.value.trim()) {
     Message.warning('请输入台词内容');
     return;
   }
-  
+
   try {
     await ProductScriptService.create({
       script_type_id: 'manual',
@@ -630,7 +669,7 @@ const addScript = async () => {
       creator: 'system',
       updater: 'system'
     });
-    
+
     await loadProductScripts(currentProduct.value.id);
     manualText.value = '';
     Message.success('添加成功');
@@ -654,7 +693,7 @@ const loadProductScripts = async (productId: string) => {
 
 // 是否全选台词
 const isAllScriptsSelected = computed(() => {
-  return filteredScripts.value.length > 0 && 
+  return filteredScripts.value.length > 0 &&
          selectedScripts.value.length === filteredScripts.value.length;
 });
 
@@ -677,7 +716,7 @@ const handleDeleteScript = async () => {
     Message.warning('请先选择要删除的台词');
     return;
   }
-  
+
   try {
     await ProductScriptService.delete(selectedScriptId.value);
     if (currentProduct.value) {
@@ -709,7 +748,7 @@ const handleSelectAllScripts = (checked: boolean) => {
 const filteredScripts = computed(() => {
   if (!currentProduct.value?.scripts) return [];
   if (!scriptSearchText.value) return currentProduct.value.scripts;
-  return currentProduct.value.scripts.filter(script => 
+  return currentProduct.value.scripts.filter(script =>
     script.text_content.toLowerCase().includes(scriptSearchText.value.toLowerCase())
   );
 });
@@ -782,7 +821,7 @@ watch(() => currentProduct.value?.id, async (newId) => {
 // 加载问答配置
 const loadQAConfig = async () => {
   if (!liveRoom.value?.id) return;
-  
+
   try {
     const config = await QAndAConfigService.getByLiveId(liveRoom.value.id);
     if (config) {
@@ -864,10 +903,10 @@ const handleStartClone = async () => {
     Message.warning('直播间ID未设置');
     return;
   }
-  
+
   try {
     Message.loading('正在上传素材并克隆中...');
-    
+
     // 调用克隆接口
     await LiveBroadcastService.update(liveId, {
       state: 'created',
@@ -913,8 +952,8 @@ const handleStartClone = async () => {
         </div>
       </div>
       <div class="flex-shrink-0">
-        <a-button 
-          type="outline" 
+        <a-button
+          type="outline"
           status="success"
           @click="showPlatformDialog = true"
         >
@@ -925,7 +964,7 @@ const handleStartClone = async () => {
         </a-button>
       </div>
     </div>
-    
+
     <div class="flex-1 flex">
       <!-- 左侧产品列表 -->
       <div class="w-60 flex-shrink-0 border-r border-gray-800 flex flex-col">
@@ -946,8 +985,8 @@ const handleStartClone = async () => {
             >
               多选
             </a-checkbox>
-            <a-button 
-              size="mini" 
+            <a-button
+              size="mini"
               status="danger"
               :disabled="selectedProducts.length === 0"
               @click="handleDelete"
@@ -970,8 +1009,8 @@ const handleStartClone = async () => {
             </div>
           </template>
           <template v-else>
-            <div 
-              v-for="product in productList" 
+            <div
+              v-for="product in productList"
               :key="product.id"
               class="px-4 py-2 cursor-pointer text-[14px] hover:bg-[#E5E6EB]"
               :class="{
@@ -985,8 +1024,8 @@ const handleStartClone = async () => {
           </template>
         </div>
         <div class="p-4">
-          <a-button 
-            type="primary" 
+          <a-button
+            type="primary"
             class="w-full mb-2"
             status="primary"
             @click="handleCreateProduct"
@@ -1007,7 +1046,7 @@ const handleStartClone = async () => {
 
       <!-- 左侧导航栏 -->
       <div class="w-20 flex-shrink-0 border-r border-gray-800">
-        <div v-for="tab in tabs" 
+        <div v-for="tab in tabs"
              :key="tab.key"
              class="py-4 px-2 cursor-pointer flex flex-col items-center"
              :class="{
@@ -1025,23 +1064,26 @@ const handleStartClone = async () => {
       <!-- 中间主内容区 -->
       <div class="flex-grow p-4">
         <!-- 主播选择面板 -->
-        <div v-if="currentTab === '主播选择'">
+        <div v-if="currentTab === '主播选择'" class="flex flex-col h-full">
           <div class="flex items-center mb-4">
             <div>当前主播 / {{ selectedAnchor?.anchor_name || '未选择' }}</div>
           </div>
-          <div class="aspect-video rounded-lg flex items-center justify-center bg-gray-50">
-            <template v-if="selectedAnchor">
-              <img :src="getImagePath(selectedAnchor.anchor_backgroud)"
-                   :alt="selectedAnchor.anchor_name"
-                   class="h-full object-contain"
-              />
-            </template>
-            <template v-else>
-              <div class="text-gray-500">请选择主播</div>
-            </template>
+          <!-- 修改图片容器和图片的样式 -->
+          <div class="w-[600px] mx-auto">
+            <div class="aspect-video rounded-lg flex items-center justify-center bg-gray-50 overflow-hidden">
+              <template v-if="selectedAnchor">
+                <img :src="getImagePath(selectedAnchor.anchor_backgroud)"
+                    :alt="selectedAnchor.anchor_name"
+                    class="w-full h-full object-contain" 
+                />
+              </template>
+              <template v-else>
+                <div class="text-gray-500">请选择主播</div>
+              </template>
+            </div>
           </div>
           <div class="mt-4 flex justify-center">
-            <a-button 
+            <a-button
               type="outline"
               :disabled="!currentProduct || !selectedAnchor"
               @click="saveCurrentSettings"
@@ -1049,8 +1091,19 @@ const handleStartClone = async () => {
               保存当前设置
             </a-button>
           </div>
+          <div class="mt-4 flex justify-center">
+              <a-button
+                  v-if="showStartLiveButton"
+                  type="primary"
+                  :status="liveRoom?.state === 'created' ? 'success' : 'danger'"
+                  :disabled="!currentProduct || !selectedAnchor"
+                  @click="handleStartLive"
+                >
+                  {{ isLiveButtonText }}
+              </a-button>
+          </div>
         </div>
-        
+
         <!-- 其他选项卡的内容 -->
         <div v-else-if="currentTab === '产品台词'" class="flex flex-col h-full">
           <!-- 主要内容区域 -->
@@ -1074,8 +1127,8 @@ const handleStartClone = async () => {
                   >
                     多选
                   </a-checkbox>
-                  <a-button 
-                    size="mini" 
+                  <a-button
+                    size="mini"
                     status="danger"
                     :disabled="!selectedScriptId"
                     @click="handleDeleteScript"
@@ -1099,22 +1152,22 @@ const handleStartClone = async () => {
                 <!-- 台词列表 -->
                 <div class="grid grid-cols-2 gap-4">
                   <template v-if="filteredScripts.length">
-                    <div 
+                    <div
                       v-for="script in filteredScripts"
-                      :key="script.id" 
+                      :key="script.id"
                       class="bg-white rounded-lg p-4 shadow cursor-pointer h-[120px] flex flex-col"
                       :class="{'ring-2 ring-blue-500': selectedScriptId === script.id}"
                       @click="handleScriptSelect(script)"
                     >
                       <div class="flex items-center justify-between mb-4">
                         <div class="flex-1 truncate" :title="script.text_content">
-                          {{ script.text_content.length > 20 
-                             ? script.text_content.slice(0, 20) + '...' 
+                          {{ script.text_content.length > 20
+                             ? script.text_content.slice(0, 20) + '...'
                              : script.text_content }}
                         </div>
                         <div class="flex items-center gap-2 ml-2 flex-shrink-0">
                           <a-tag>{{ script.script_type_id === 'manual' ? '文本' : 'AI' }}</a-tag>
-                          <a-button 
+                          <a-button
                             size="mini"
                             @click="(e) => handleEditScript(script, e)"
                           >
@@ -1168,7 +1221,7 @@ const handleStartClone = async () => {
                         </div>
                       </div>
                     </div>
-                    
+
                     <!-- 手动/AI撰写选项卡 -->
                     <div class="mb-4">
                       <a-tabs class="w-full">
@@ -1185,7 +1238,7 @@ const handleStartClone = async () => {
                             />
                             <div class="mt-2 flex justify-between text-gray-400 text-sm">
                               <span>剩余可输入字符数: {{ remainingChars }}</span>
-                              <a-button 
+                              <a-button
                                 type="primary"
                                 size="small"
                                 :disabled="!manualText.trim() || !currentProduct"
@@ -1220,8 +1273,8 @@ const handleStartClone = async () => {
                               </a-button>
                             </div>
                             <div class="flex justify-end">
-                              <a-button 
-                                type="primary" 
+                              <a-button
+                                type="primary"
                                 size="small"
                                 @click="addToList('ai')"
                                 :disabled="!aiGeneratedText"
@@ -1234,7 +1287,7 @@ const handleStartClone = async () => {
                       </a-tabs>
                     </div>
                   </a-tab-pane>
-                  
+
                   <!-- 音频台词编辑选项卡 -->
                   <a-tab-pane key="audio" title="音频台词编辑">
                     <div class="bg-white rounded-lg p-4 shadow">
@@ -1256,7 +1309,7 @@ const handleStartClone = async () => {
             <div class="flex-grow pr-4 pt-4 min-h-full">
               <!-- 标题 -->
               <div class="mb-4">添加关键词问答</div>
-              
+
               <!-- 内容区域 -->
               <div class="bg-white rounded-lg p-4 mb-4 shadow">
                 <!-- 操作按钮和搜索框 -->
@@ -1275,12 +1328,12 @@ const handleStartClone = async () => {
                     选择问题
                   </a-button>
                 </div>
-                
+
                 <!-- 问答列表 -->
                 <div class="space-y-4">
                   <!-- 问题种类列表 -->
-                  <div v-for="category in currentProduct?.questionCategories" 
-                       :key="category.id" 
+                  <div v-for="category in currentProduct?.questionCategories"
+                       :key="category.id"
                        class="bg-[#1D1E2B] rounded-lg p-4"
                   >
                     <div class="flex items-center justify-between mb-4">
@@ -1306,8 +1359,8 @@ const handleStartClone = async () => {
                     </div>
                     <!-- Q&A列表 -->
                     <div class="space-y-2 pl-4">
-                      <div v-for="qa in category.qas" 
-                           :key="qa.id" 
+                      <div v-for="qa in category.qas"
+                           :key="qa.id"
                            class="flex flex-col gap-2 py-2">
                         <div class="flex items-center justify-between">
                           <div class="text-gray-400">Q: {{ qa.question }}</div>
@@ -1386,7 +1439,8 @@ const handleStartClone = async () => {
       </div>
 
       <!-- 右侧主播列表 -->
-      <div v-if="currentTab === '主播选择'" class="w-72 flex-shrink-0 border-l border-gray-800 p-4">
+      <div v-if="currentTab === '主播选择'" class="w-96 flex-shrink-0 border-l border-gray-800 pl-4 pt-4 min-h-full">
+        <template v-if="!showStartLiveButton">
         <div class="mb-4">
           <a-tabs>
             <a-tab-pane key="1" title="主播广场" />
@@ -1394,25 +1448,25 @@ const handleStartClone = async () => {
           </a-tabs>
         </div>
         <div>
-          <a-input-search 
-            placeholder="搜索主播" 
+          <a-input-search
+            placeholder="搜索主播"
             allow-clear
             v-model="searchText"
             @search="handleSearch"
             @clear="handleSearch('')"
           />
         </div>
-        
+
         <!-- 主播列表 -->
         <div class="grid grid-cols-2 min-h-[500px]">
-          <div v-for="anchor in currentAnchors" 
-               :key="anchor.id" 
+          <div v-for="anchor in currentAnchors"
+               :key="anchor.id"
                class="flex flex-col cursor-pointer"
                @click="handleAnchorSelect(anchor)">
             <div class="aspect-[3/4] rounded-lg overflow-hidden relative">
-              <img :src="getImagePath(anchor.anchor_backgroud)" 
+              <img :src="getImagePath(anchor.anchor_backgroud)"
                    :alt="anchor.anchor_name"
-                   class="w-full h-full object-cover" 
+                   class="w-full h-full object-cover"
               />
               <div v-if="selectedAnchor?.id === anchor.id"
                    class="absolute inset-0 ring-4 ring-blue-500 ring-opacity-75">
@@ -1436,7 +1490,20 @@ const handleStartClone = async () => {
             size="small"
           />
         </div>
+        </template>
+        <template v-else>
+          <div class="h-full">
+            <div class="text-lg font-medium mb-4">
+              AI智能互动
+            </div>
+            <div class="bg-white rounded-lg p-4 h-[calc(100%-2rem)]">
+              <!-- AI智能互动设置表单 -->
+              
+            </div>
+          </div>
+        </template>
       </div>
+
     </div>
   </div>
 
@@ -1489,11 +1556,11 @@ const handleStartClone = async () => {
   />
 
   <!-- 添加创建产品对话框 -->
-  <CreateProductDialog 
+  <CreateProductDialog
     ref="createProductDialog"
     @success="handleProductCreated"
   />
-  
+
  <!-- 编辑台词对话框 -->
  <a-modal
     v-model:visible="showEditScriptDialog"
@@ -1520,7 +1587,7 @@ const handleStartClone = async () => {
       <a-button @click="handleCancelEdit">取消</a-button>
       <a-button type="primary" @click="handleSaveScript">保存</a-button>
     </template>
-  </a-modal> 
+  </a-modal>
 </template>
 
 <style scoped>
@@ -1543,4 +1610,4 @@ const handleStartClone = async () => {
   background-color: #165DFF;
   color: #fff;
 }
-</style> 
+</style>
