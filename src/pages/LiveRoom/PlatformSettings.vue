@@ -254,13 +254,13 @@
               <!-- 左侧设置区域 -->
               <div class="w-[400px] flex-shrink-0">
                 <div class="mb-4 text-lg font-medium">新增点赞互动设置</div>
-                <!-- 互动方式 -->
+                <!-- 点赞互动方式 -->
                 <div class="mb-4">
                   <div class="mb-2">新增点赞互动方式</div>
-                  <a-radio-group v-model="popularitySettings.replyMode">
-                    <a-radio value="danmu">弹幕</a-radio>
-                    <a-radio value="host">主播</a-radio>
-                    <a-radio value="both">弹幕和助播</a-radio>
+                  <a-radio-group v-model="popularitySettings.like.replyWay">
+                    <a-radio :value="0">弹幕</a-radio>
+                    <a-radio :value="1">弹幕和助播</a-radio>
+                    <a-radio :value="2">助播</a-radio>
                   </a-radio-group>
                 </div>
                 <!-- 新增点赞触发条件 -->
@@ -276,8 +276,8 @@
                   </div>
                   <!-- 触发规则列表 -->
                   <div class="rounded-lg p-4 h-[400px] overflow-y-auto">
-                    <template v-if="popularitySettings.likeRules.length">
-                      <div v-for="rule in popularitySettings.likeRules" 
+                    <template v-if="popularitySettings.like.rules.length">
+                      <div v-for="rule in popularitySettings.like.rules" 
                            :key="rule.id"
                            class="border border-gray-600 rounded-lg p-4 mb-3 last:mb-0"
                       >
@@ -328,13 +328,13 @@
               <!-- 右侧内容区域 -->
               <div class="flex-grow">
                 <div class="mb-4 text-lg font-medium">在线人数互动设置</div>
-                <!-- 互动方式 -->
+                <!-- 在线人数互动方式 -->
                 <div class="mb-4">
                   <div class="mb-2">新增在线人数互动方式</div>
-                  <a-radio-group v-model="popularitySettings.onlineReplyMode">
-                    <a-radio value="danmu">弹幕</a-radio>
-                    <a-radio value="assistant">助播</a-radio>
-                    <a-radio value="both">弹幕和助播</a-radio>
+                  <a-radio-group v-model="popularitySettings.online.replyWay">
+                    <a-radio :value="0">弹幕</a-radio>
+                    <a-radio :value="1">弹幕和助播</a-radio>
+                    <a-radio :value="2">助播</a-radio>
                   </a-radio-group>
                 </div>
                 
@@ -350,8 +350,8 @@
                 </div>
                 <!-- 内容列表 -->
                 <div class="rounded-lg p-4 h-[400px] overflow-y-auto">
-                  <template v-if="popularitySettings.onlineRules.length">
-                    <div v-for="rule in popularitySettings.onlineRules" 
+                  <template v-if="popularitySettings.online.rules.length">
+                    <div v-for="rule in popularitySettings.online.rules" 
                          :key="rule.id"
                          class="border border-gray-600 rounded-lg p-4 mb-3 last:mb-0"
                     >
@@ -401,7 +401,7 @@
             
             <!-- 底部面板 -->
             <div class="flex justify-end items-center h-16 mt-4 pt-4 border-t border-gray-200">
-              <a-button type="primary">
+              <a-button type="primary" @click="savePopularitySettings">
                 保存当前设置
               </a-button>
             </div>
@@ -416,7 +416,7 @@
               <!-- 左侧设置区域 -->
               <div class="w-[400px] flex-shrink-0">
                 <div class="mb-4 text-lg font-medium">礼物感谢互动设置</div>
-                <!-- 互动方式 -->
+                <!-- 礼物互动方式 -->
                 <div class="mb-4">
                   <div class="mb-2">感谢方式</div>
                   <a-radio-group v-model="giftSettings.replyMode">
@@ -426,7 +426,7 @@
                   </a-radio-group>
                 </div>
                 
-                <!-- 引导间隔设置 -->
+                <!-- 礼物感谢规则 -->
                 <div class="mb-4">
                   <div class="mb-2">礼物感谢规则</div>
                   <div class="space-y-3">
@@ -540,6 +540,33 @@
         :auto-size="{ minRows: 3, maxRows: 6 }"
       />
     </a-modal>
+    <!-- 规则编辑对话框 -->
+    <a-modal
+      v-model:visible="showRuleDialog"
+      :title="editingRule.id ? '编辑规则' : '新增规则'"
+      @ok="handleRuleConfirm"
+      @cancel="showRuleDialog = false"
+    >
+      <div class="space-y-4">
+        <div class="flex items-center gap-2">
+          <span class="w-20">触发数量：</span>
+          <a-input-number
+            v-model="editingRule.count"
+            :min="0"
+            class="w-24"
+          />
+          <span>{{ currentRuleType === 'like' ? '点赞' : '人' }}</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="w-20">互动内容：</span>
+          <a-textarea
+            v-model="editingRule.content"
+            placeholder="请输入互动内容"
+            :auto-size="{ minRows: 3, maxRows: 6 }"
+          />
+        </div>
+      </div>
+    </a-modal>
   </a-modal>
 </template>
 
@@ -548,6 +575,8 @@ import { defineProps, defineEmits, computed, ref, reactive, onMounted, watch } f
 import { Message } from '@arco-design/web-vue';
 import OverallSituationConfigService, { OverallSituationConfigRecord } from '../../service/OverallSituationConfigService';
 import RegularInteractionConfigService from '../../service/RegularInteractionConfigService';
+import LikeConfigService from '../../service/LikeConfigService';
+import OnLineNumberConfigService from '../../service/OnLineNumberConfigService';
 
 interface Settings {
   runMode: number;
@@ -907,87 +936,96 @@ const handleTabChange = (key: string) => {
 };
 
 // 人气互动设置
+const defaultPopularitySettings = {
+  like: {
+    enable: 1,
+    replyWay: 1,  // 0=弹幕, 1=弹幕和助播, 2=助播
+    rules: []     // 点赞规则列表，默认为空
+  },
+  online: {
+    enable: 1,
+    replyWay: 1,  // 0=弹幕, 1=弹幕和助播, 2=助播
+    rules: []     // 在线人数规则列表，默认为空
+  }
+};
+
 const popularitySettings = reactive({
-  replyMode: 'danmu',      // 点赞互动方式
-  onlineReplyMode: 'danmu', // 在线人数互动方式
-  likeRules: [             // 点赞触发规则列表
-    { 
-      id: 1, 
-      count: 10,
-      content: ''
-    },
-    { 
-      id: 2, 
-      count: 50,
-      content: ''
-    }
-  ],
-  onlineRules: [           // 在线人数触发规则列表
-    {
-      id: 1,
-      count: 10,
-      content: ''
-    },
-    {
-      id: 2,
-      count: 50,
-      content: ''
-    }
-  ]
+  like: {
+    enable: 1,
+    replyWay: 1,
+    rules: [] as Array<{ id: number; count: number; content: string }>
+  },
+  online: {
+    enable: 1,
+    replyWay: 1,
+    rules: [] as Array<{ id: number; count: number; content: string }>
+  }
 });
 
 // 删除点赞规则
 const deleteLikeRule = (ruleId: number) => {
-  const index = popularitySettings.likeRules.findIndex(rule => rule.id === ruleId);
+  const index = popularitySettings.like.rules.findIndex(rule => rule.id === ruleId);
   if (index > -1) {
-    popularitySettings.likeRules.splice(index, 1);
+    popularitySettings.like.rules.splice(index, 1);
   }
 };
 
 // 删除在线人数规则
 const deleteOnlineRule = (ruleId: number) => {
-  const index = popularitySettings.onlineRules.findIndex(rule => rule.id === ruleId);
+  const index = popularitySettings.online.rules.findIndex(rule => rule.id === ruleId);
   if (index > -1) {
-    popularitySettings.onlineRules.splice(index, 1);
+    popularitySettings.online.rules.splice(index, 1);
   }
 };
 
 // 编辑点赞规则
 const editLikeRule = (rule: any) => {
-  // 这里可以添加编辑逻辑，比如打开编辑对话框
-  console.log('编辑点赞规则:', rule);
+  editingRule.value = { ...rule };
+  currentRuleType.value = 'like';
+  showRuleDialog.value = true;
 };
 
 // 编辑在线人数规则
 const editOnlineRule = (rule: any) => {
-  // 这里可以添加编辑逻辑，比如打开编辑对话框
-  console.log('编辑在线人数规则:', rule);
+  editingRule.value = { ...rule };
+  currentRuleType.value = 'online';
+  showRuleDialog.value = true;
+};
+
+// 确认编辑规则
+const handleRuleConfirm = () => {
+  if (!currentRuleType.value || !popularitySettings[currentRuleType.value]) {
+    return;
+  }
+  
+  const rules = popularitySettings[currentRuleType.value].rules;
+  if (!Array.isArray(rules)) {
+    popularitySettings[currentRuleType.value].rules = [];
+  }
+  
+  const index = rules.findIndex(item => item.id === editingRule.value.id);
+  
+  if (index > -1) {
+    rules[index] = { ...editingRule.value };
+  } else {
+    rules.push({ ...editingRule.value });
+  }
+  
+  showRuleDialog.value = false;
 };
 
 // 添加点赞规则
 const addLikeRule = () => {
-  const newId = popularitySettings.likeRules.length > 0 
-    ? Math.max(...popularitySettings.likeRules.map(rule => rule.id)) + 1 
-    : 1;
-  
-  popularitySettings.likeRules.push({
-    id: newId,
-    count: 0,
-    content: ''
-  });
+  editingRule.value = { id: Date.now(), count: 0, content: '' };
+  currentRuleType.value = 'like';
+  showRuleDialog.value = true;
 };
 
 // 添加在线人数规则
 const addOnlineRule = () => {
-  const newId = popularitySettings.onlineRules.length > 0 
-    ? Math.max(...popularitySettings.onlineRules.map(rule => rule.id)) + 1 
-    : 1;
-  
-  popularitySettings.onlineRules.push({
-    id: newId,
-    count: 0,
-    content: ''
-  });
+  editingRule.value = { id: Date.now(), count: 0, content: '' };
+  currentRuleType.value = 'online';
+  showRuleDialog.value = true;
 };
 
 // 礼物感谢设置
@@ -1038,6 +1076,123 @@ const handleEditGuideConfirm = () => {
   
   showEditGuideDialog.value = false;
 };
+
+// 加载人气互动配置
+const loadPopularitySettings = async () => {
+  if (!props.liveId) return;
+  
+  try {
+    // 加载点赞配置
+    const likeConfig = await LikeConfigService.getByLiveId(props.liveId);
+    if (likeConfig) {
+      popularitySettings.like = {
+        enable: likeConfig.enable ?? defaultPopularitySettings.like.enable,
+        replyWay: likeConfig.reply_way ?? defaultPopularitySettings.like.replyWay,
+        rules: likeConfig.like_parameters ? 
+          JSON.parse(likeConfig.like_parameters) : 
+          structuredClone(defaultPopularitySettings.like.rules)
+      };
+    } else {
+      // 使用默认配置
+      popularitySettings.like = structuredClone(defaultPopularitySettings.like);
+    }
+    
+    // 加载在线人数配置
+    const onlineConfig = await OnLineNumberConfigService.getByLiveId(props.liveId);
+    if (onlineConfig) {
+      popularitySettings.online = {
+        enable: onlineConfig.enable ?? defaultPopularitySettings.online.enable,
+        replyWay: onlineConfig.reply_way ?? defaultPopularitySettings.online.replyWay,
+        rules: onlineConfig.onLine_number_parameters ? 
+          JSON.parse(onlineConfig.onLine_number_parameters) : 
+          structuredClone(defaultPopularitySettings.online.rules)
+      };
+    } else {
+      // 使用默认配置
+      popularitySettings.online = structuredClone(defaultPopularitySettings.online);
+    }
+  } catch (error) {
+    console.error('加载人气互动配置失败:', error);
+    Message.error('加载配置失败');
+    Object.assign(popularitySettings, structuredClone(defaultPopularitySettings));
+  }
+};
+
+// 保存人气互动配置
+const savePopularitySettings = async () => {
+  if (!props.liveId) {
+    Message.warning('直播间ID未设置');
+    return;
+  }
+  
+  try {
+    // 保存点赞配置
+    const likeConfig = await LikeConfigService.getByLiveId(props.liveId);
+    if (likeConfig?.id) {
+      await LikeConfigService.update(likeConfig.id, {
+        enable: popularitySettings.like.enable,
+        reply_way: popularitySettings.like.replyWay,
+        like_parameters: JSON.stringify(popularitySettings.like.rules),
+        platform: props.platform,
+        updater: 'system'
+      });
+    } else {
+      // 创建新的点赞配置
+      await LikeConfigService.create({
+        live_id: props.liveId,
+        platform: props.platform,
+        enable: popularitySettings.like.enable,
+        reply_way: popularitySettings.like.replyWay,
+        like_parameters: JSON.stringify(popularitySettings.like.rules),
+        creator: 'system'
+      });
+    }
+    
+    // 保存在线人数配置
+    const onlineConfig = await OnLineNumberConfigService.getByLiveId(props.liveId);
+    if (onlineConfig?.id) {
+      await OnLineNumberConfigService.update(onlineConfig.id, {
+        enable: popularitySettings.online.enable,
+        reply_way: popularitySettings.online.replyWay,
+        onLine_number_parameters: JSON.stringify(popularitySettings.online.rules),
+        platform: props.platform,
+        updater: 'system'
+      });
+    } else {
+      // 创建新的在线人数配置
+      await OnLineNumberConfigService.create({
+        live_id: props.liveId,
+        platform: props.platform,
+        enable: popularitySettings.online.enable,
+        reply_way: popularitySettings.online.replyWay,
+        onLine_number_parameters: JSON.stringify(popularitySettings.online.rules),
+        creator: 'system'
+      });
+    }
+    
+    Message.success('保存成功');
+  } catch (error) {
+    console.error('保存人气互动配置失败:', error);
+    Message.error('保存失败');
+  }
+};
+
+// 监听visible变化
+watch(() => props.visible, (val) => {
+  modalVisible.value = val;
+  if (val) {
+    loadGlobalSettings();
+    loadTimingSettings();
+    loadPopularitySettings();
+  }
+});
+
+// 编辑规则对话框状态
+const showRuleDialog = ref(false);
+// 当前编辑的规则
+const editingRule = ref<{ id: number; count: number; content: string }>({ id: 0, count: 0, content: '' });
+// 当前编辑的规则类型
+const currentRuleType = ref<'like' | 'online'>('like');
 </script>
 
 <style scoped>
