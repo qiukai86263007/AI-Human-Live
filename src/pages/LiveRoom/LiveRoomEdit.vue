@@ -16,6 +16,7 @@ import QAndAConfigService, { QAndAConfigRecord } from '../../service/QAndAConfig
 
 const router = useRouter();
 const route = useRoute();
+const emit = defineEmits(['refresh']);
 const currentTab = ref('主播选择');
 const currentPage = ref(1);
 const createProductDialog = ref();
@@ -856,6 +857,32 @@ const handleOpenSettings = () => {
   showPlatformSettings.value = true;
 };
 
+// 开始克隆
+const handleStartClone = async () => {
+  const liveId = route.query.id as string;
+  if (!liveId) {
+    Message.warning('直播间ID未设置');
+    return;
+  }
+  
+  try {
+    Message.loading('正在上传素材并克隆中...');
+    
+    // 调用克隆接口
+    await LiveBroadcastService.update(liveId, {
+      state: 'created',
+      update_date: new Date().toISOString(),
+      updater: 'current_user'
+    });
+    Message.success('克隆成功');
+    // 通知父组件刷新列表
+    emit('refresh');
+  } catch (error) {
+    console.error('克隆失败:', error);
+    Message.error('克隆失败');
+  }
+};
+
 </script>
 
 <template>
@@ -969,7 +996,7 @@ const handleOpenSettings = () => {
             </template>
             新建产品
           </a-button>
-          <a-button type="primary" class="w-full">
+          <a-button type="primary" class="w-full" @click="handleStartClone">
             <template #icon>
               <icon-play />
             </template>
