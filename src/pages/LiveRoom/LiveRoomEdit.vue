@@ -13,6 +13,8 @@ import ProductSceneService, { ProductSceneRecord } from '../../service/ProductSc
 import ProductScriptService, {ProductScriptRecord} from '../../service/ProductScriptService';
 import QAndAService, { QAndARecord } from '../../service/QAndAService';
 import QAndAConfigService, { QAndAConfigRecord } from '../../service/QAndAConfigService';
+import GiftThankConfigService from '../../service/GiftThankConfigService';
+import RegularInteractionConfigService from '../../service/RegularInteractionConfigService';
 
 const router = useRouter();
 const route = useRoute();
@@ -128,9 +130,9 @@ const selectedPlatformDemo = ref('');
 const roomIdDemo = ref('');
 const anchorNameDemo = ref('');
 const rulesDemo = ref({
-  productQA: true,
-  giftThanks: true,
-  welcomeGuide: true,
+  productQA: 0,
+  giftThanks: 0,
+  welcomeGuide: 0,
   popularActivity: true,
   smartScript: true
 });
@@ -891,11 +893,75 @@ watch(() => liveRoom.value?.id, async (newId) => {
   }
 });
 
-// 组件挂载时加载数据
+// 加载规则设置
+const loadRuleSettings = async () => {
+  const liveId = route.query.id as string;
+  if (!liveId) return;
+  
+  try {
+    // 加载产品问答配置
+    const qaConfig = await QAndAConfigService.getByLiveId(liveId);
+    rulesDemo.value.productQA = qaConfig?.enable ?? 0;
+    // 加载礼物感谢配置
+    const giftConfig = await GiftThankConfigService.getByLiveId(liveId);
+    rulesDemo.value.giftThanks = giftConfig?.enable ?? 0;
+    // 加载定时引导配置
+    const regularConfig = await RegularInteractionConfigService.getByLiveId(liveId);
+    rulesDemo.value.welcomeGuide = regularConfig?.enable ?? 0;
+  } catch (error) {
+    console.error('加载规则设置失败:', error);
+  }
+};
+
+// 监听规则设置变化
+watch(() => rulesDemo.value.productQA, async (newValue) => {
+  const liveId = route.query.id as string;
+  if (!liveId) return;
+  
+  try {
+    const config = await QAndAConfigService.getByLiveId(liveId);
+    if (config?.id) {
+      await QAndAConfigService.update(config.id, { enable: newValue });
+    }
+  } catch (error) {
+    console.error('更新产品问答配置失败:', error);
+  }
+});
+
+watch(() => rulesDemo.value.giftThanks, async (newValue) => {
+  const liveId = route.query.id as string;
+  if (!liveId) return;
+  
+  try {
+    const config = await GiftThankConfigService.getByLiveId(liveId);
+    if (config?.id) {
+      await GiftThankConfigService.update(config.id, { enable: newValue });
+    }
+  } catch (error) {
+    console.error('更新礼物感谢配置失败:', error);
+  }
+});
+
+watch(() => rulesDemo.value.welcomeGuide, async (newValue) => {
+  const liveId = route.query.id as string;
+  if (!liveId) return;
+  
+  try {
+    const config = await RegularInteractionConfigService.getByLiveId(liveId);
+    if (config?.id) {
+      await RegularInteractionConfigService.update(config.id, { enable: newValue });
+    }
+  } catch (error) {
+    console.error('更新定时引导配置失败:', error);
+  }
+});
+
+// 在组件挂载时加载规则设置
 onMounted(() => {
   loadLiveRoom();
   loadProducts();
   loadAnchors();
+  loadRuleSettings();
 });
 
 // 打开平台设置
