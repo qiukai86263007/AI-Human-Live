@@ -15,6 +15,7 @@ import QAndAService, { QAndARecord } from '../../service/QAndAService';
 import QAndAConfigService, { QAndAConfigRecord } from '../../service/QAndAConfigService';
 import GiftThankConfigService from '../../service/GiftThankConfigService';
 import RegularInteractionConfigService from '../../service/RegularInteractionConfigService';
+import LiveParameterService from '../../service/LiveParameterService';
 
 const router = useRouter();
 const route = useRoute();
@@ -956,12 +957,63 @@ watch(() => rulesDemo.value.welcomeGuide, async (newValue) => {
   }
 });
 
-// 在组件挂载时加载规则设置
+// 监听直播平台、房间ID和主播名称的变化
+watch([selectedPlatformDemo, roomIdDemo, anchorNameDemo], async () => {
+  const liveId = route.query.id as string;
+  if (!liveId) return;
+  
+  try {
+    // 获取现有配置
+    let config = await LiveParameterService.getByLiveId(liveId);
+    
+    const updateData = {
+      platform: selectedPlatformDemo.value,
+      live_room_id: roomIdDemo.value,
+      anchor_name: anchorNameDemo.value,
+      updater: 'current_user'
+    };
+    
+    if (config) {
+      // 更新现有配置
+      await LiveParameterService.update(config.id!, updateData);
+    } else {
+      // 创建新配置
+      await LiveParameterService.create({
+        live_id: liveId,
+        ...updateData,
+        creator: 'current_user'
+      });
+    }
+  } catch (error) {
+    console.error('更新直播参数失败:', error);
+    Message.error('更新配置失败');
+  }
+});
+
+// 加载直播参数
+const loadLiveParameter = async () => {
+  const liveId = route.query.id as string;
+  if (!liveId) return;
+  
+  try {
+    const config = await LiveParameterService.getByLiveId(liveId);
+    if (config) {
+      selectedPlatformDemo.value = config.platform || '';
+      roomIdDemo.value = config.live_room_id || '';
+      anchorNameDemo.value = config.anchor_name || '';
+    }
+  } catch (error) {
+    console.error('加载直播参数失败:', error);
+  }
+};
+
+// 在组件挂载时加载数据
 onMounted(() => {
   loadLiveRoom();
   loadProducts();
   loadAnchors();
   loadRuleSettings();
+  loadLiveParameter();
 });
 
 // 打开平台设置
@@ -1583,12 +1635,12 @@ const handleStartClone = async () => {
                     <!-- <template #prefix>
                       <img src="`/platform-icons/${selectedPlatform}.png`" class="w-5 h-5 rounded-full" />
                     </template> -->
-                    <a-option value="kuaishou">快手</a-option>
-                    <a-option value="douyin">抖音</a-option>
-                    <a-option value="channels">视频号</a-option>
-                    <a-option value="tiktok">TikTok</a-option>
-                    <a-option value="meituan">美团</a-option>
-                    <a-option value="taobao">淘宝</a-option>
+                    <a-option value="快手">快手</a-option>
+                    <a-option value="抖音">抖音</a-option>
+                    <a-option value="视频号">视频号</a-option>
+                    <a-option value="Tiktok">TikTok</a-option>
+                    <a-option value="美团">美团</a-option>
+                    <a-option value="淘宝">淘宝</a-option>
                   </a-select>
                 </div>
               </div>
