@@ -1677,7 +1677,7 @@ const handleStartClone = async () => {
             <div>
               <div class="mb-6">
                 <div class="text-base mb-4">直播间公屏</div>
-                <div class="h-60 bg-[#2A2B3C] rounded flex items-center justify-center">
+                <div class="h-96 bg-[#2A2B3C] rounded flex items-center justify-center">
                   <div class="text-center text-gray-400">
                     <div class="mb-2">
                       <icon-monitor class="text-3xl" />
