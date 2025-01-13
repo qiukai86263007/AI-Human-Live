@@ -37,8 +37,8 @@
                 <div class="mb-2">运行模式</div>
                 <div class="flex items-center gap-4">
                   <a-radio-group v-model="settings.runMode">
-                    <a-radio value="smart">智能弹夹</a-radio>
-                    <a-radio value="practice">实时弹夹</a-radio>
+                    <a-radio :value="0">智能弹夹</a-radio>
+                    <a-radio :value="1">实时弹夹</a-radio>
                   </a-radio-group>
                 </div>
 
@@ -54,13 +54,13 @@
                     :max="100"
                     class="w-24"
                   />
-                  <span>秒内一次关键词不重复回复</span>
+                  <span>每隔*秒发送一次</span>
                 </div>
               </div>
               
               <!-- 优先级设置 -->
               <div>
-                <div class="mb-2">优先级设置</div>
+                <div class="mb-2">弹幕优先级设置</div>
                 <div class="flex flex-wrap gap-4">
                   <div v-for="item in priorityItems" 
                        :key="item.key" 
@@ -78,7 +78,7 @@
                   </div>
                 </div>
                 <div class="text-gray-400 text-sm mt-1">
-                  数字越大优先级越高，仅针对智能模式生效
+                  数字越大优先级越高，仅针对智能弹夹模式生效
                 </div>
               </div>
             </div>
@@ -103,10 +103,10 @@
                 <!-- 引导内容类型选择 -->
                 <div class="mb-4">
                   <div class="mb-2">引导方式</div>
-                  <a-radio-group>
-                    <a-radio value="danmu">弹幕</a-radio>
-                    <a-radio value="assistant">助播</a-radio>
-                    <a-radio value="both">弹幕和助播</a-radio>
+                  <a-radio-group v-model="timingSettings.replyWay">
+                    <a-radio :value="0">弹幕</a-radio>
+                    <a-radio :value="1">弹幕和助播</a-radio>
+                    <a-radio :value="2">助播</a-radio>
                   </a-radio-group>
                 </div>
                 
@@ -115,10 +115,10 @@
                   <div class="mb-2">引导间隔</div>
                   <div class="flex items-center gap-2">
                     <a-input-number
+                      v-model="timingSettings.intervalTime"
                       :min="0"
                       :max="100"
                       class="w-24"
-                      :default-value="60"
                     />
                     <span>秒</span>
                   </div>
@@ -132,7 +132,7 @@
                     <div class="flex items-center gap-2">
                       <span class="w-24">综合引导：</span>
                       <a-input-number
-                        v-model="timingSettings.probabilities.comprehensive"
+                        v-model="timingSettings.chances.all"
                         :min="0"
                         :max="100"
                         class="w-20"
@@ -143,29 +143,27 @@
                     <div class="flex items-center gap-2">
                       <span class="w-24">关注引导：</span>
                       <a-input-number
-                        v-model="timingSettings.probabilities.follow"
+                        v-model="timingSettings.chances.follow"
                         :min="0"
                         :max="100"
                         class="w-20"
                       />
                       <span>%</span>
                     </div>
-                    <!-- 消费引导概率 -->
                     <div class="flex items-center gap-2">
                       <span class="w-24">消费引导：</span>
                       <a-input-number
-                        v-model="timingSettings.probabilities.consume"
+                        v-model="timingSettings.chances.cost"
                         :min="0"
                         :max="100"
                         class="w-20"
                       />
                       <span>%</span>
                     </div>
-                    <!-- 分享引导概率 -->
                     <div class="flex items-center gap-2">
                       <span class="w-24">分享引导：</span>
                       <a-input-number
-                        v-model="timingSettings.probabilities.share"
+                        v-model="timingSettings.chances.share"
                         :min="0"
                         :max="100"
                         class="w-20"
@@ -178,9 +176,9 @@
                 <!-- 引导发送方式 -->
                 <div class="mb-4">
                   <div class="mb-2">发送方式</div>
-                  <a-radio-group>
-                    <a-radio>顺序发送</a-radio>
-                    <a-radio>随机发送</a-radio>
+                  <a-radio-group v-model="timingSettings.runMode">
+                    <a-radio :value="0">顺序发送</a-radio>
+                    <a-radio :value="1">随机发送</a-radio>
                   </a-radio-group>
                 </div>
               </div>
@@ -199,7 +197,7 @@
                 <!-- 引导内容列表 -->
                 <div>
                   <div class="flex mb-4">
-                    <a-button type="primary">
+                    <a-button type="primary" @click="addGuide">
                       <template #icon>
                         <icon-plus />
                       </template>
@@ -215,12 +213,12 @@
                         <div class="flex items-center justify-between">
                           <div>{{ guide.content }}</div>
                           <div class="flex items-center gap-2">
-                            <a-button type="text" size="mini">
+                            <a-button type="text" size="mini" @click="editGuide(guide)">
                               <template #icon>
                                 <icon-edit />
                               </template>
                             </a-button>
-                            <a-button type="text" size="mini" status="danger">
+                            <a-button type="text" size="mini" status="danger" @click="deleteGuide(guide.id)">
                               <template #icon>
                                 <icon-delete />
                               </template>
@@ -241,7 +239,7 @@
             
             <!-- 底部面板 -->
             <div class="flex justify-end items-center h-16 mt-4 pt-4 border-t border-gray-200">
-              <a-button type="primary">
+              <a-button type="primary" @click="saveTimingSettings">
                 保存当前设置
               </a-button>
             </div>
@@ -530,36 +528,58 @@
         </div>
       </div>
     </div>
+    <a-modal
+      v-model:visible="showEditGuideDialog"
+      title="编辑引导内容"
+      @ok="handleEditGuideConfirm"
+      @cancel="showEditGuideDialog = false"
+    >
+      <a-textarea
+        v-model="editingGuide.content"
+        placeholder="请输入引导内容"
+        :auto-size="{ minRows: 3, maxRows: 6 }"
+      />
+    </a-modal>
   </a-modal>
 </template>
 
 <script setup lang="ts">
-import { defineProps, defineEmits, computed, ref, reactive } from 'vue';
+import { defineProps, defineEmits, computed, ref, reactive, onMounted, watch } from 'vue';
+import { Message } from '@arco-design/web-vue';
+import OverallSituationConfigService, { OverallSituationConfigRecord } from '../../service/OverallSituationConfigService';
+import RegularInteractionConfigService from '../../service/RegularInteractionConfigService';
 
 interface Settings {
-  runMode: 'smart' | 'practice';
+  runMode: number;
   replyDelay: number;
   priorities: {
-    productQA: number;
-    activity: number;
-    welcome: number;
-    gift: number;
-    popularity: number;
+    regularInteraction: number;
+    ordinaryUser: number;
+    giftThank: number;
+    qanda: number;
+    aiChat: number;
   };
+  naturalLanguageSwitch: number;
+  anchorNick: string;
 }
 
-// 设置数据
-const settings = reactive<Settings>({
-  runMode: 'smart',
+// 设置数据的默认值
+const defaultSettings = {
+  runMode: 0,
   replyDelay: 10,
   priorities: {
-    productQA: 4,
-    activity: 3,
-    welcome: 2,
-    gift: 1,
-    popularity: 0
-  }
-});
+    regularInteraction: 3,
+    ordinaryUser: 2,
+    giftThank: 4,
+    qanda: 5,
+    aiChat: 1
+  },
+  naturalLanguageSwitch: 1,
+  anchorNick: ''
+};
+
+// 初始化设置
+const settings = ref({ ...defaultSettings });
 
 // 选项卡配置
 const tabs = [
@@ -574,14 +594,11 @@ const currentTab = ref('global');
 
 const props = defineProps<{
   visible: boolean;
-  platform?: string;  // 平台名称
+  platform?: string;
+  liveId?: string;
 }>();
 
-const emit = defineEmits<{
-  (e: 'update:visible', value: boolean): void;
-  (e: 'back'): void;
-  (e: 'close'): void;
-}>();
+const emit = defineEmits(['update:visible', 'close']);
 
 // 使用计算属性处理 v-model
 const modalVisible = computed({
@@ -603,55 +620,285 @@ const handleClose = (e: Event) => {
 };
 
 // 处理保存
-const handleSave = () => {
-  // TODO: 实际保存逻辑
-  console.log('保存设置:', settings);
-  // 可以添加保存成功提示
-  Message.success('设置已保存');
+const handleSave = async () => {
+  if (!props.liveId) {
+    Message.warning('直播间ID未设置');
+    return;
+  }
+  
+  try {
+    const config = await OverallSituationConfigService.getByLiveId(props.liveId);
+    if (config?.id) {
+      await OverallSituationConfigService.update(config.id, {
+        operation_mode: settings.value.runMode,
+        operation_time: settings.value.replyDelay,
+        regular_interaction_priority: settings.value.priorities.regularInteraction,
+        ordinary_user_priority: settings.value.priorities.ordinaryUser,
+        gift_thank_priority: settings.value.priorities.giftThank,
+        qanda_priority: settings.value.priorities.qanda,
+        aiChat_priority: settings.value.priorities.aiChat,
+        globalnatural_language_switch: settings.value.naturalLanguageSwitch,
+        globalanchor_nick: settings.value.anchorNick,
+        platform: props.platform,
+        updater: 'system'
+      });
+      Message.success('保存成功');
+    }
+  } catch (error) {
+    console.error('保存全局设置失败:', error);
+    Message.error('保存失败');
+  }
 };
 
 // 优先级配置
 const priorityItems = [
-  { key: 'productQA', label: '产品问答' },
-  { key: 'activity', label: '活动引导' },
-  { key: 'welcome', label: '欢迎' },
-  { key: 'gift', label: '礼物感谢' },
-  { key: 'popularity', label: '人气互动' },
+  { key: 'regularInteraction', label: '常规互动' },
+  { key: 'ordinaryUser', label: '普通用户' },
+  { key: 'giftThank', label: '礼物感谢' },
+  { key: 'qanda', label: '问答' },
+  { key: 'aiChat', label: 'AI聊天' }
 ];
 
-// 定时引导设置
-const timingSettings = reactive({
-  type: 'comprehensive', // 引导类型
-  replyMode: 'danmu',   // 回复方式：弹幕/助播/both
-  interval: 60,         // 引导间隔
-  probabilities: {      // 各类型引导概率
-    comprehensive: 25,  // 综合引导概率
-    follow: 25,        // 关注引导概率
-    consume: 25,       // 消费引导概率
-    share: 25          // 分享引导概率
+// 加载全局设置
+const loadGlobalSettings = async () => {
+  if (!props.liveId) return;
+  
+  try {
+    const config = await OverallSituationConfigService.getByLiveId(props.liveId);
+    if (config) {
+      settings.value = {
+        runMode: config.operation_mode ?? defaultSettings.runMode,
+        replyDelay: config.operation_time ?? defaultSettings.replyDelay,
+        priorities: {
+          regularInteraction: config.regular_interaction_priority ?? defaultSettings.priorities.regularInteraction,
+          ordinaryUser: config.ordinary_user_priority ?? defaultSettings.priorities.ordinaryUser,
+          giftThank: config.gift_thank_priority ?? defaultSettings.priorities.giftThank,
+          qanda: config.qanda_priority ?? defaultSettings.priorities.qanda,
+          aiChat: config.aiChat_priority ?? defaultSettings.priorities.aiChat
+        },
+        naturalLanguageSwitch: config.globalnatural_language_switch ?? defaultSettings.naturalLanguageSwitch,
+        anchorNick: config.globalanchor_nick || defaultSettings.anchorNick
+      };
+    } else {
+      // 创建新配置，使用默认值
+      const id = await OverallSituationConfigService.create({
+        live_id: props.liveId,
+        platform: props.platform,
+        operation_mode: defaultSettings.runMode,
+        operation_time: defaultSettings.replyDelay,
+        regular_interaction_priority: defaultSettings.priorities.regularInteraction,
+        ordinary_user_priority: defaultSettings.priorities.ordinaryUser,
+        gift_thank_priority: defaultSettings.priorities.giftThank,
+        qanda_priority: defaultSettings.priorities.qanda,
+        aiChat_priority: defaultSettings.priorities.aiChat,
+        globalnatural_language_switch: defaultSettings.naturalLanguageSwitch,
+        creator: 'system'
+      });
+      settings.value = { ...defaultSettings };
+    }
+  } catch (error) {
+    console.error('加载全局设置失败:', error);
+    Message.error('加载设置失败');
+    settings.value = { ...defaultSettings };
+  }
+};
+
+// 监听visible变化
+watch(() => props.visible, (val) => {
+  modalVisible.value = val;
+  if (val) {
+    loadGlobalSettings();
+  }
+});
+
+// 定时引导默认配置
+const defaultTimingSettings = {
+  enable: 1,
+  runMode: 0,  // run_mode: 0=顺序, 1=随机
+  intervalTime: 60,  // interval_time
+  replyWay: 1,  // reply_way: 0=弹幕, 1=弹幕和助播, 2=助播
+  chances: {
+    all: 25,     // guide_all_chance
+    follow: 25,  // guide_follow_chance
+    cost: 25,    // guide_cost_chance
+    share: 25    // guide_share_chance
   },
-  sendMode: 'sequence'  // 发送方式
+  contents: {
+    all: '',     // guide_all_contents
+    follow: '',  // guide_follow_contents
+    cost: '',    // guide_cost_contents
+    share: ''    // guide_share_contents
+  }
+};
+
+// 初始化定时引导设置
+const timingSettings = ref({ ...defaultTimingSettings });
+
+// 加载定时引导配置
+const loadTimingSettings = async () => {
+  if (!props.liveId) return;
+  
+  try {
+    const config = await RegularInteractionConfigService.getByLiveId(props.liveId);
+    if (config) {
+      timingSettings.value = {
+        enable: config.enable ?? defaultTimingSettings.enable,
+        runMode: config.run_mode ?? defaultTimingSettings.runMode,
+        intervalTime: config.interval_time ?? defaultTimingSettings.intervalTime,
+        replyWay: config.reply_way ?? defaultTimingSettings.replyWay,
+        chances: {
+          all: config.guide_all_chance ?? defaultTimingSettings.chances.all,
+          follow: config.guide_follow_chance ?? defaultTimingSettings.chances.follow,
+          cost: config.guide_cost_chance ?? defaultTimingSettings.chances.cost,
+          share: config.guide_share_chance ?? defaultTimingSettings.chances.share
+        },
+        contents: {
+          all: config.guide_all_contents || '',
+          follow: config.guide_follow_contents || '',
+          cost: config.guide_cost_contents || '',
+          share: config.guide_share_contents || ''
+        }
+      };
+      // 加载引导内容
+      loadGuideContents();
+    } else {
+      // 创建新配置，使用默认值
+      const id = await RegularInteractionConfigService.create({
+        live_id: props.liveId,
+        platform: props.platform,
+        enable: defaultTimingSettings.enable,
+        run_mode: defaultTimingSettings.runMode,
+        interval_time: defaultTimingSettings.intervalTime,
+        reply_way: defaultTimingSettings.replyWay,
+        guide_all_chance: defaultTimingSettings.chances.all,
+        guide_follow_chance: defaultTimingSettings.chances.follow,
+        guide_cost_chance: defaultTimingSettings.chances.cost,
+        guide_share_chance: defaultTimingSettings.chances.share,
+        creator: 'system'
+      });
+      timingSettings.value = { ...defaultTimingSettings };
+    }
+  } catch (error) {
+    console.error('加载定时引导配置失败:', error);
+    Message.error('加载配置失败');
+    timingSettings.value = { ...defaultTimingSettings };
+  }
+};
+
+// 保存定时引导配置
+const saveTimingSettings = async () => {
+  if (!props.liveId) {
+    Message.warning('直播间ID未设置');
+    return;
+  }
+  
+  // 保存引导内容到 timingSettings
+  saveGuideContents();
+  
+  try {
+    const config = await RegularInteractionConfigService.getByLiveId(props.liveId);
+    if (config?.id) {
+      await RegularInteractionConfigService.update(config.id, {
+        enable: timingSettings.value.enable,
+        run_mode: timingSettings.value.runMode,
+        interval_time: timingSettings.value.intervalTime,
+        reply_way: timingSettings.value.replyWay,
+        guide_all_chance: timingSettings.value.chances.all,
+        guide_follow_chance: timingSettings.value.chances.follow,
+        guide_cost_chance: timingSettings.value.chances.cost,
+        guide_share_chance: timingSettings.value.chances.share,
+        guide_all_contents: timingSettings.value.contents.all,
+        guide_follow_contents: timingSettings.value.contents.follow,
+        guide_cost_contents: timingSettings.value.contents.cost,
+        guide_share_contents: timingSettings.value.contents.share,
+        platform: props.platform,
+        updater: 'system'
+      });
+      Message.success('保存成功');
+    }
+  } catch (error) {
+    console.error('保存定时引导配置失败:', error);
+    Message.error('保存失败');
+  }
+};
+
+// 监听visible变化
+watch(() => props.visible, (val) => {
+  modalVisible.value = val;
+  if (val) {
+    loadGlobalSettings();
+    loadTimingSettings();
+  }
 });
 
 // 当前选中的引导类型
 const currentGuideType = ref('综合引导');
 
 // 引导内容列表
-const guideList = reactive({
-  '综合引导': [
-    { id: 1, content: '这是一条综合引导内容' },
-    { id: 2, content: '这是另一条综合引导内容' }
-  ],
-  '关注引导': [
-    { id: 3, content: '这是一条关注引导内容' }
-  ],
+const guideList = ref({
+  '综合引导': [],
+  '关注引导': [],
   '消费引导': [],
   '分享引导': []
 });
 
+// 引导类型映射
+const guideTypeMap = {
+  '综合引导': 'all',
+  '关注引导': 'follow',
+  '消费引导': 'cost',
+  '分享引导': 'share'
+};
+
+// 加载引导内容
+const loadGuideContents = () => {
+  Object.keys(guideList.value).forEach(type => {
+    const key = guideTypeMap[type];
+    const content = timingSettings.value.contents[key];
+    if (content) {
+      try {
+        guideList.value[type] = JSON.parse(content);
+      } catch {
+        guideList.value[type] = [];
+      }
+    } else {
+      guideList.value[type] = [];
+    }
+  });
+};
+
+// 保存引导内容到 timingSettings
+const saveGuideContents = () => {
+  Object.keys(guideList.value).forEach(type => {
+    const key = guideTypeMap[type];
+    timingSettings.value.contents[key] = JSON.stringify(guideList.value[type]);
+  });
+};
+
+// 添加引导内容
+const addGuide = () => {
+  editingGuide.value = { id: Date.now(), content: '' };
+  showEditGuideDialog.value = true;
+};
+
+// 编辑引导内容
+const editGuide = (guide: { id: number; content: string }) => {
+  editingGuide.value = { ...guide };
+  showEditGuideDialog.value = true;
+};
+
+// 删除引导内容
+const deleteGuide = (guideId: number) => {
+  const list = guideList.value[currentGuideType.value];
+  const index = list.findIndex(item => item.id === guideId);
+  if (index > -1) {
+    list.splice(index, 1);
+  }
+};
+
 // 获取当前类型的引导列表
 const getGuideList = (type: string) => {
-  return guideList[type] || [];
+  return guideList.value[type] || [];
 };
 
 // 监听选项卡变化
@@ -768,6 +1015,28 @@ const giftGuideList = reactive({
 // 监听礼物引导选项卡变化
 const handleGiftTabChange = (key: string) => {
   currentGiftType.value = key;
+};
+
+// 编辑对话框显示状态
+const showEditGuideDialog = ref(false);
+
+// 当前编辑的引导内容
+const editingGuide = ref<{ id: number; content: string }>({ id: 0, content: '' });
+
+// 添加确认编辑方法
+const handleEditGuideConfirm = () => {
+  const list = guideList.value[currentGuideType.value];
+  const index = list.findIndex(item => item.id === editingGuide.value.id);
+  
+  if (index > -1) {
+    // 更新已存在的引导内容
+    list[index] = { ...editingGuide.value };
+  } else {
+    // 添加新的引导内容
+    list.push({ ...editingGuide.value });
+  }
+  
+  showEditGuideDialog.value = false;
 };
 </script>
 

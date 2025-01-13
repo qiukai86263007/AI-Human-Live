@@ -806,30 +806,34 @@ const loadQAConfig = async () => {
   }
 };
 
-// 保存问答配置
-const saveQAConfig = async () => {
-  if (!qaConfig.value?.id || !liveRoom.value?.id) {
-    Message.warning('配置未初始化');
-    return;
+// 监听配置变化并保存
+watch(replyDelay, async (newValue) => {
+  if (qaConfig.value?.id) {
+    try {
+      await QAndAConfigService.update(qaConfig.value.id, {
+        appoint_within_do_not_reply: newValue,
+        updater: 'system'
+      });
+    } catch (error) {
+      console.error('更新回复延迟失败:', error);
+    }
   }
-  
-  try {
-    await QAndAConfigService.update(qaConfig.value.id, {
-      live_id: liveRoom.value.id,
-      enable: 1,
-      reply_way: parseInt(replyMode.value),
-      appoint_within_do_not_reply: replyDelay.value,
-      updater: 'system'
-    });
-    
-    Message.success('保存成功');
-  } catch (error) {
-    console.error('保存问答配置失败:', error);
-    Message.error('保存失败');
-  }
-};
+});
 
-// 保持直播间加载时的配置加载
+watch(replyMode, async (newValue) => {
+  if (qaConfig.value?.id) {
+    try {
+      await QAndAConfigService.update(qaConfig.value.id, {
+        reply_way: parseInt(newValue),
+        updater: 'system'
+      });
+    } catch (error) {
+      console.error('更新回复方式失败:', error);
+    }
+  }
+});
+
+// 在直播间加载时加载配置
 watch(() => liveRoom.value?.id, async (newId) => {
   if (newId) {
     await loadQAConfig();
@@ -842,6 +846,15 @@ onMounted(() => {
   loadProducts();
   loadAnchors();
 });
+
+// 打开平台设置
+const handleOpenSettings = () => {
+  if (!liveRoom.value?.id) {
+    Message.warning('请先创建直播间');
+    return;
+  }
+  showPlatformSettings.value = true;
+};
 
 </script>
 
@@ -1332,10 +1345,7 @@ onMounted(() => {
                   </div>
                 </div>
                 <div class="flex justify-end">
-                  <a-button 
-                    type="primary"
-                    @click="saveQAConfig"
-                  >
+                  <a-button type="primary">
                     保存当前设置
                   </a-button>
                 </div>
@@ -1446,6 +1456,7 @@ onMounted(() => {
   <PlatformSettings
     v-model:visible="showPlatformSettings"
     :platform="selectedPlatform"
+    :live-id="liveRoom?.id"
     @back="handleSettingsBack"
     @close="showPlatformSettings = false"
   />

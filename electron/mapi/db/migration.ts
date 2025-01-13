@@ -213,6 +213,80 @@ const versions = [
                     updater VARCHAR(255),
                     update_date TIMESTAMP
             )`);
+            await db.execute(`CREATE TABLE IF NOT EXISTS overall_situation_config (
+                id VARCHAR(255) PRIMARY KEY,
+                live_id VARCHAR(255),
+                platform VARCHAR(255),
+                live_room_no VARCHAR(255),
+                operation_mode INTEGER DEFAULT 0,
+                operation_time INTEGER DEFAULT 0,
+                regular_interaction_priority INTEGER DEFAULT 0,
+                ordinary_user_priority INTEGER DEFAULT 0,
+                gift_thank_priority INTEGER DEFAULT 0,
+                qanda_priority INTEGER DEFAULT 0,
+                aiChat_priority INTEGER DEFAULT 0,
+                globalnatural_language_switch INTEGER DEFAULT 0,
+                globalanchor_nick VARCHAR(255),
+                state VARCHAR(255) DEFAULT 'normal',
+                create_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                creator VARCHAR(255),
+                updater VARCHAR(255),
+                update_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )`);
+            await db.execute(`CREATE TABLE IF NOT EXISTS gift_thank_config (
+                id VARCHAR(255) PRIMARY KEY,
+                live_id VARCHAR(255),
+                enable INTEGER DEFAULT 1,
+                reply_way INTEGER DEFAULT 1,
+                thank_rule INTEGER DEFAULT 0,
+                gift_money INTEGER DEFAULT 0,
+                small_amount_money INTEGER DEFAULT 0,
+                small_amount_thank_contents TEXT,
+                big_amount_thank_contents TEXT,
+                strengthen_thankcontents TEXT,
+                strengthen_thank_enable INTEGER DEFAULT 0,
+                state VARCHAR(255) DEFAULT 'normal',
+                create_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                creator VARCHAR(255),
+                updater VARCHAR(255),
+                update_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                platform VARCHAR(255)
+            )`);
+            await db.execute(`CREATE TABLE IF NOT EXISTS regular_interaction_config (
+                id VARCHAR(255) PRIMARY KEY,
+                live_id VARCHAR(255),
+                enable INTEGER DEFAULT 1,
+                run_mode INTEGER DEFAULT 0,
+                interval_time INTEGER DEFAULT 0,
+                reply_way INTEGER DEFAULT 1,
+                guide_all_chance INTEGER DEFAULT 0,
+                guide_follow_chance INTEGER DEFAULT 0,
+                guide_cost_chance INTEGER DEFAULT 0,
+                guide_share_chance INTEGER DEFAULT 0,
+                guide_all_contents TEXT,
+                guide_follow_contents TEXT,
+                guide_cost_contents TEXT,
+                guide_share_contents TEXT,
+                state VARCHAR(255) DEFAULT 'normal',
+                create_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                creator VARCHAR(255),
+                updater VARCHAR(255),
+                update_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                platform VARCHAR(255)
+            )`);
+            await db.execute(`CREATE TABLE IF NOT EXISTS onLine_number_config (
+                id VARCHAR(255) PRIMARY KEY,
+                live_id VARCHAR(255),
+                enable INTEGER DEFAULT 1,
+                reply_way INTEGER DEFAULT 1,
+                onLine_number_parameters TEXT,
+                state VARCHAR(255) DEFAULT 'normal',
+                create_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                creator VARCHAR(255),
+                updater VARCHAR(255),
+                update_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                platform VARCHAR(255)
+            )`);
             const userDataPath = app.getPath('userData');
             const anchorsPath = join(userDataPath, 'resources/images/anchors');
 
