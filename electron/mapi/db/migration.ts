@@ -287,6 +287,19 @@ const versions = [
                 update_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 platform VARCHAR(255)
             )`);
+            await db.execute(`CREATE TABLE IF NOT EXISTS like_config (
+                id VARCHAR(255) PRIMARY KEY,
+                live_id VARCHAR(255),
+                enable INTEGER DEFAULT 1,
+                reply_way INTEGER DEFAULT 1,
+                like_parameters TEXT,
+                state VARCHAR(255) DEFAULT 'normal',
+                create_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                creator VARCHAR(255),
+                updater VARCHAR(255),
+                update_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                platform VARCHAR(255)
+            )`);
             const userDataPath = app.getPath('userData');
             const anchorsPath = join(userDataPath, 'resources/images/anchors');
 
