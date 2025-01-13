@@ -300,6 +300,33 @@ const versions = [
                 update_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 platform VARCHAR(255)
             )`);
+            await db.execute(`CREATE TABLE IF NOT EXISTS platform_config (
+                id VARCHAR(255) PRIMARY KEY,
+                live_id VARCHAR(255),
+                platform VARCHAR(255),
+                state VARCHAR(255),
+                create_date TIMESTAMP,
+                creator VARCHAR(255),
+                updater VARCHAR(255),
+                update_date TIMESTAMP
+            )`);
+            await db.execute(`CREATE TABLE IF NOT EXISTS live_parameter (
+                id VARCHAR(100) PRIMARY KEY,
+                live_id VARCHAR(100),
+                product_play_rule VARCHAR(100),
+                scene_play_rule VARCHAR(100),
+                script_play_rule VARCHAR(100),
+                state VARCHAR(20),
+                create_date TIMESTAMP,
+                creator VARCHAR(100),
+                updater VARCHAR(100),
+                update_date TIMESTAMP,
+                isgeneralization VARCHAR(100),
+                platform VARCHAR(255),
+                rule_list VARCHAR(1000),
+                live_room_id VARCHAR(100),
+                anchor_name VARCHAR(100)
+            )`);
             const userDataPath = app.getPath('userData');
             const anchorsPath = join(userDataPath, 'resources/images/anchors');
 
