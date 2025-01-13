@@ -123,6 +123,17 @@ const addToList = (type: 'manual' | 'ai') => {
   Message.success('添加成功');
 };
 
+// 添加需要的响应式数据
+const selectedPlatformDemo = ref('');
+const roomIdDemo = ref('');
+const anchorNameDemo = ref('');
+const rulesDemo = ref({
+  productQA: true,
+  giftThanks: true,
+  welcomeGuide: true,
+  popularActivity: true,
+  smartScript: true
+});
 // 生成AI内容
 const generateAiContent = () => {
   if (!aiKeyword.value) return;
@@ -1496,9 +1507,83 @@ const handleStartClone = async () => {
             <div class="text-lg font-medium mb-4">
               AI智能互动
             </div>
-            <div class="bg-white rounded-lg p-4 h-[calc(100%-2rem)]">
-              <!-- AI智能互动设置表单 -->
-              
+            <!-- AI智能互动设置表单 -->
+            <div>
+              <!-- 直播平台选择 -->
+              <div class="mb-4">
+                <div class="flex items-center gap-4 mb-2">
+                  <span class="w-20">直播平台</span>
+                  <a-select class="flex-1" v-model="selectedPlatformDemo" :disabled="!canEditAISettings">
+                    <!-- <template #prefix>
+                      <img src="`/platform-icons/${selectedPlatform}.png`" class="w-5 h-5 rounded-full" />
+                    </template> -->
+                    <a-option value="kuaishou">快手</a-option>
+                    <a-option value="douyin">抖音</a-option>
+                    <a-option value="channels">视频号</a-option>
+                    <a-option value="tiktok">TikTok</a-option>
+                    <a-option value="meituan">美团</a-option>
+                    <a-option value="taobao">淘宝</a-option>
+                  </a-select>
+                </div>
+              </div>
+
+              <!-- 房间信息 -->
+              <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="flex items-center gap-4">
+                  <span class="w-20">房间号ID</span>
+                  <a-input class="flex-1" v-model="roomIdDemo" :disabled="!canEditAISettings" />
+                </div>
+                <div class="flex items-center gap-4">
+                  <span class="w-20">主播名称</span>
+                  <a-input class="flex-1" v-model="anchorNameDemo" :disabled="!canEditAISettings"/>
+                </div>
+              </div>
+
+              <!-- 规则设置 -->
+              <div class="mb-6">
+                <div class="text-base mb-4">规则设置</div>
+                <div class="grid grid-cols-2 gap-4">
+                  <a-checkbox v-model="rulesDemo.productQA" :disabled="!canEditAISettings">产品问答</a-checkbox>
+                  <a-checkbox v-model="rulesDemo.giftThanks" :disabled="!canEditAISettings">礼物感谢</a-checkbox>
+                  <a-checkbox v-model="rulesDemo.welcomeGuide" :disabled="!canEditAISettings">定时引导</a-checkbox>
+                  <a-checkbox v-model="rulesDemo.popularActivity" :disabled="!canEditAISettings">人气互动</a-checkbox>
+                </div>
+                <div class="mt-2">
+                  <a-checkbox v-model="rulesDemo.smartScript" :disabled="!canEditAISettings">
+                    智能剧本(该话术和剧本随机选取一个播放)
+                  </a-checkbox>
+                </div>
+              </div>
+            </div>
+            <!-- 直播间公屏 -->
+            <div>
+              <div class="mb-6">
+                <div class="text-base mb-4">直播间公屏</div>
+                <div class="h-60 bg-[#2A2B3C] rounded flex items-center justify-center">
+                  <div class="text-center text-gray-400">
+                    <div class="mb-2">
+                      <icon-monitor class="text-3xl" />
+                    </div>
+                    <div>暂无公屏信息</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 底部按钮 -->
+              <div class="flex gap-4 justify-center">
+                <a-button class="w-32" :disabled="canEditAISettings">
+                  <template #icon>
+                    <icon-voice />
+                  </template>
+                  语音设置
+                </a-button>
+                <a-button class="w-32" :disabled="canEditAISettings">
+                  <template #icon>
+                    <icon-file />
+                  </template>
+                  文本设置
+                </a-button>
+              </div>
             </div>
           </div>
         </template>
@@ -1609,5 +1694,19 @@ const handleStartClone = async () => {
 :deep(.arco-pagination-item.arco-pagination-item-active) {
   background-color: #165DFF;
   color: #fff;
+}
+
+:deep(.arco-select) {
+  background-color: transparent;
+  border: none;
+}
+
+:deep(.arco-input) {
+  background-color: transparent;
+  border: none;
+}
+
+:deep(.arco-checkbox) {
+  color: white;
 }
 </style>
