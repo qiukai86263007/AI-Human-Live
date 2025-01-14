@@ -50,9 +50,6 @@
             <div v-else class="w-full h-full rounded-lg bg-[#1D1E2B] flex items-center justify-center">
               <icon-user class="text-2xl text-gray-400" />
             </div>
-            <div class="absolute -top-2 -left-2 bg-blue-500 text-white text-xs px-1 rounded">
-              XIII
-            </div>
           </div>
 
           <!-- 状态和操作区域 -->
@@ -78,11 +75,6 @@
     <a-modal v-model:visible="showCloneVoiceDialog" title="新建克隆声音" width="500" @ok="handleSaveCloneVoice"
       @cancel="handleCancelCloneVoice">
       <div class="clone-voice-form">
-        <!-- <a-radio-group v-model="selectedPlatform" class="mb-4">
-          <a-radio value="aliyun">阿里云</a-radio>
-          <a-radio value="huoshan">火山引擎</a-radio>
-        </a-radio-group> -->
-
         <div class="mb-4">
           <div>
             <span>上传音频文件：</span>
