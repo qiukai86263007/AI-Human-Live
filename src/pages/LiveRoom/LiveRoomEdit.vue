@@ -294,6 +294,8 @@ const handleStartLive = async () => {
         cancelText: '否',
         onOk: () => {
           Message.success('场控已开启');
+          // 开启场控逻辑，传入平台数据（房间号，主播名）
+          // 读取场控规则，开始场控
         },
         onCancel: () => {
           Message.success('场控已关闭');
@@ -1704,18 +1706,17 @@ const handleStartClone = async () => {
 
               <!-- 底部按钮 -->
               <div class="flex gap-4 justify-center">
-                <a-button class="w-32" :disabled="canEditAISettings">
-                  <template #icon>
-                    <icon-voice />
-                  </template>
-                  语音设置
-                </a-button>
-                <a-button class="w-32" :disabled="canEditAISettings">
-                  <template #icon>
-                    <icon-file />
-                  </template>
-                  文本设置
-                </a-button>
+                  <a-input
+                    class="flex-1"
+                    placeholder="请输入消息内容"
+                    :disabled="canEditAISettings"
+                  />
+                  <a-button type="primary" :disabled="canEditAISettings">
+                    <template #icon>
+                      <icon-send />
+                    </template>
+                    发送
+                  </a-button>
               </div>
             </div>
           </div>
