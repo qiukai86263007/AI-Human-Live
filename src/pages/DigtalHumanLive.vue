@@ -15,7 +15,7 @@ const typeOptions = [
   { label: '全部', value: '全部' },
   { label: '编辑中', value: 'editing' },
   { label: '待开播', value: 'created' },
-  { label: '直播中', value: 'running' },
+  { label: '直播中', value: 'live' },
 ];
 
 // 加载直播间列表
@@ -77,7 +77,7 @@ const getStateColor = (state?: string) => {
       return 'blue';
     case 'created':
       return 'orange';
-    case 'running':
+    case 'live':
       return 'green';
     default:
       return 'gray';
@@ -90,7 +90,7 @@ const getStateText = (state?: string) => {
       return '编辑中';
     case 'created':
       return '待开播';
-    case 'running':
+    case 'live':
       return '直播中';
     default:
       return '未知状态';
