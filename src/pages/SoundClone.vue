@@ -24,7 +24,7 @@
         </a-button>
         <a-button>
           <template #icon>
-            <icon-refresh />
+            <icon-refresh @click="loadSoundList" />
           </template>
         </a-button>
       </div>
@@ -55,28 +55,20 @@
             </div>
           </div>
 
-          <!-- 信息区域 -->
-          <div class="flex-grow">
-            <div class="flex items-center gap-2 mb-2">
-              <span class="text-lg font-medium text-white">{{ sound.name }}</span>
-              <a-tag v-if="sound.level" color="purple" size="small">{{ sound.level }}</a-tag>
-            </div>
-            <div class="text-sm text-gray-300">
-              克隆ID: {{ sound.id }}
-            </div>
-            <div class="text-sm text-gray-300">
-              {{ sound.trainDate }} 训练次数{{ sound.trainCount }}
-            </div>
-          </div>
-
           <!-- 状态和操作区域 -->
           <div class="flex items-center gap-4">
             <a-tag color="green" v-if="sound.canUse">可使用</a-tag>
-            <a-button type="text">
+            <a-button type="text" @click="handleEdit(sound)">
               <template #icon>
                 <icon-edit />
               </template>
               编辑
+            </a-button>
+            <a-button type="text" status="danger" @click="handleDelete(sound.id)">
+              <template #icon>
+                <icon-delete />
+              </template>
+              删除
             </a-button>
           </div>
         </div>
@@ -103,7 +95,7 @@
               <icon-plus />
             </div>
             <div v-if="audioFileName" class="upload-filename">{{ audioFileName }}</div>
-            <div class="upload-text">支持WAV/MP3/M4A格式,建议大小不超过2MB</div>
+            <div class="upload-text">支持WAV/MP3/M4A格式,建议大小不超过5MB</div>
           </div>
           <input
             type="file"
@@ -179,24 +171,16 @@ import { PathManager } from '../utils/pathManager';
 interface SoundCloneItem {
   id: string;
   name: string;
-  trainCount: string;
-  trainDate: string;
   canUse: boolean;
   level?: string;
   avatar?: string;
+  create_date?: string;
+  audio_url?: string;
+  image_url?: string;
+  state?: string;
 }
 
-const soundList = ref<SoundCloneItem[]>([
-  {
-    id: 'S_VesFaHCe1',
-    name: '小范/普通话',
-    trainCount: '3/10',
-    trainDate: '2025/01/02',
-    canUse: true,
-    level: 'L'
-  },
-  //可以添加更多声音克隆记录
-]);
+const soundList = ref<SoundCloneItem[]>([]);
 
 const showCloneVoiceDialog = ref(false);
 const selectedPlatform = ref('aliyun');
@@ -220,18 +204,74 @@ const saveFile = async (file: File, subDir: string): Promise<string> => {
   const buffer = await file.arrayBuffer();
   const ext = file.name.split('.').pop();
   const fileName = `${uuidv4()}.${ext}`;
-  const filePath = await window.$mapi.file.fullPath(`${subDir}/${fileName}`);
-  
+  const fullSubDir = await window.$mapi.file.fullPath(`${subDir}`);
+  const filePath = `${fullSubDir}/${fileName}`;
+  console.log(filePath);
   // 确保目录存在
-  await window.$mapi.file.mkdir(subDir);
+  await window.$mapi.file.mkdir(fullSubDir);
   
   // 写入文件
-  await window.$mapi.file.writeBuffer(filePath, Buffer.from(buffer));
+  await window.$mapi.file.writeBuffer(filePath, Buffer.from(buffer),{ isFullPath: true });
   
   // 转换为标准化的 URL 格式存储到数据库
   return PathManager.toStoragePath(filePath);
 };
 
+// 加载声音克隆列表
+const loadSoundList = async () => {
+  try {
+    const list = await AudioCharacterService.list();
+    soundList.value = list.map(item => ({
+      id: item.id || '',
+      name: item.name || '',
+      canUse: item.state === 'normal',
+      level: 'L',
+      avatar: item.image_url,
+      create_date: item.create_date,
+      audio_url: item.audio_url,
+      image_url: item.image_url,
+      state: item.state
+    }));
+  } catch (error) {
+    console.error('加载声音克隆列表失败:', error);
+    Message.error('加载声音克隆列表失败');
+  }
+};
+
+// 删除声音克隆
+const handleDelete = async (id: string) => {
+  try {
+    await Modal.confirm({
+      title: '确认删除',
+      content: '确定要删除这个声音克隆吗？',
+      onOk: async () => {
+        await AudioCharacterService.delete(id);
+        Message.success('删除成功');
+        loadSoundList();
+      }
+    });
+  } catch (error) {
+    console.error('删除失败:', error);
+    Message.error('删除失败');
+  }
+};
+
+// 编辑声音克隆
+const handleEdit = async (item: SoundCloneItem) => {
+  try {
+    name.value = item.name;
+    audioText.value = (await AudioCharacterService.get(item.id))?.audio_text || '';
+    showCloneVoiceDialog.value = true;
+  } catch (error) {
+    console.error('加载编辑数据失败:', error);
+    Message.error('加载编辑数据失败');
+  }
+};
+
+// 在组件挂载时加载列表
+onMounted(() => {
+  loadSoundList();
+});
 
 const handleSaveCloneVoice = async () => {
   try {
@@ -252,13 +292,13 @@ const handleSaveCloneVoice = async () => {
     
     // 保存音频文件
     const audioPath = await saveFile(audioFile.value, 'audio');
-    
+    console.log(audioPath);
     // 保存图片文件（如果有）
     let imagePath = '';
     if (imageFile.value) {
       imagePath = await saveFile(imageFile.value, 'images');
     }
-    
+    console.log(imagePath);
     // 保存到数据库
     await AudioCharacterService.create({
       name: name.value,
@@ -275,6 +315,9 @@ const handleSaveCloneVoice = async () => {
     
     Message.success('保存成功');
     showCloneVoiceDialog.value = false;
+    
+    // 刷新列表
+    await loadSoundList();
     
     // 重置表单
     name.value = '';
@@ -304,8 +347,8 @@ const handleAudioUpload = (e: Event) => {
       Message.error('请上传WAV/MP3/M4A格式的音频文件');
       return;
     }
-    // 检查文件大小（2MB = 2 * 1024 * 1024 bytes）
-    if (file.size > 2 * 1024 * 1024) {
+    // 检查文件大小（5MB = 5 * 1024 * 1024 bytes）
+    if (file.size > 5 * 1024 * 1024) {
       Message.error('音频文件大小不能超过5MB');
       return;
     }
