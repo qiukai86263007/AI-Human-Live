@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import { Message } from '@arco-design/web-vue';
+import { Message, Modal } from '@arco-design/web-vue';
 import PlatformSelector from './PlatformSelector.vue';
 import PlatformSettings from './PlatformSettings.vue';
 import CreateProductDialog from '../../components/Product/CreateProductDialog.vue';
@@ -285,7 +285,22 @@ const handleStartLive = async () => {
   try {
     const newState = liveRoom.value?.state === 'created' ? 'live' : 'created';
     const actionText = newState === 'live' ? '启动' : '停止';
-    
+    // 如果是要开始直播，显示确认对话框
+    if (newState === 'live') {
+      const confirmResult = await Modal.confirm({
+        title: '开启场控',
+        content: '是否同时开启场控？',
+        okText: '是',
+        cancelText: '否',
+        onOk: () => {
+          Message.success('场控已开启');
+        },
+        onCancel: () => {
+          Message.success('场控已关闭');
+        }
+      });
+      
+    }
     Message.loading(`正在${actionText}直播...`);
     await LiveBroadcastService.update(liveId, {
       state: newState,
