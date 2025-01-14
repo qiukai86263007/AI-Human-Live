@@ -18,6 +18,8 @@ const activeTab = computed(() => {
             return 'server'
         case '/sound':
             return 'sound'
+        case '/avatar':
+            return 'avatar'
         case '/setting':
             return 'setting'
         case '/video':
@@ -77,6 +79,15 @@ const doUser = async () => {
                     <icon-sound class="text-xl"/>
                 </div>
                 <div class="text-sm">{{ $t('声音克隆') }}</div>
+            </a>
+            <a class="page-nav-item block text-center py-3"
+               :class="activeTab==='avatar'?'active':''"
+               @click="$router.push('/avatar')"
+               href="javascript:;">
+                <div>
+                    <icon-user class="text-xl"/>
+                </div>
+                <div class="text-sm">{{ $t('形象克隆') }}</div>
             </a>
             <a class="page-nav-item block text-center py-3"
                :class="activeTab==='server'?'active':''"

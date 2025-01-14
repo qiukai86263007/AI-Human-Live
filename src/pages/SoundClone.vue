@@ -103,10 +103,10 @@
             <span>音频文件对应的文字内容：</span>
           </div>
           <div>
-            <a-textarea 
+            <a-textarea
               v-model="audioText"
-              placeholder="请输入音频文件对应的文字内容" 
-              :auto-size="{ minRows: 3, maxRows: 6 }" 
+              placeholder="请输入音频文件对应的文字内容"
+              :auto-size="{ minRows: 3, maxRows: 6 }"
             />
           </div>
         </div>
@@ -201,10 +201,10 @@ const saveFile = async (file: File, subDir: string): Promise<string> => {
   console.log(filePath);
   // 确保目录存在
   await window.$mapi.file.mkdir(fullSubDir);
-  
+
   // 写入文件
   await window.$mapi.file.writeBuffer(filePath, Buffer.from(buffer),{ isFullPath: true });
-  
+
   // 转换为标准化的 URL 格式存储到数据库
   return PathManager.toStoragePath(filePath);
 };
@@ -271,17 +271,17 @@ const handleSaveCloneVoice = async () => {
       Message.error('请上传音频文件');
       return;
     }
-    
+
     if (!name.value) {
       Message.error('请输入音频源昵称');
       return;
     }
-    
+
     if (!audioText.value) {
       Message.error('请输入音频文件对应的文字内容');
       return;
     }
-    
+
     // 保存音频文件
     const audioPath = await saveFile(audioFile.value, 'audio');
     console.log(audioPath);
@@ -304,13 +304,13 @@ const handleSaveCloneVoice = async () => {
       audio_url: audioPath,
       creator: 'system',
     });
-    
+
     Message.success('保存成功');
     showCloneVoiceDialog.value = false;
-    
+
     // 刷新列表
     await loadSoundList();
-    
+
     // 重置表单
     name.value = '';
     gender.value = 'male';
@@ -319,7 +319,7 @@ const handleSaveCloneVoice = async () => {
     audioFileName.value = '';
     imageFile.value = null;
     imageFileName.value = '';
-    
+
   } catch (error) {
     console.error('保存失败:', error);
     Message.error('保存失败');

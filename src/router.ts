@@ -16,6 +16,10 @@ const routes = [
             {
                 path: 'live-room/edit',
                 component: () => import('./pages/LiveRoom/LiveRoomEdit.vue')
+            },
+            {
+                path: '/avatar',
+                component: () => import('./pages/AvatarClone.vue')
             }
         ]
     },
