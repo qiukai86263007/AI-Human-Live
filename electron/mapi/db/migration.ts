@@ -327,6 +327,22 @@ const versions = [
                 live_room_id VARCHAR(100),
                 anchor_name VARCHAR(100)
             )`);
+            await db.execute(`CREATE TABLE IF NOT EXISTS audio_character (
+                id VARCHAR(255) PRIMARY KEY,
+                name VARCHAR(255),
+                gender_id INTEGER,
+                language_id INTEGER,
+                state VARCHAR(255),
+                audio_text TEXT,
+                create_date TIMESTAMP,
+                creator VARCHAR(255),
+                updater VARCHAR(255),
+                update_date TIMESTAMP,
+                configType INTEGER,
+                version INTEGER,
+                image_url VARCHAR(255),
+                audio_url VARCHAR(255)
+            )`);
             const userDataPath = app.getPath('userData');
             const anchorsPath = join(userDataPath, 'resources/images/anchors');
 
