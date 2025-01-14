@@ -198,7 +198,6 @@ const saveFile = async (file: File, subDir: string): Promise<string> => {
   const fileName = `${uuidv4()}.${ext}`;
   const fullSubDir = await window.$mapi.file.fullPath(`${subDir}`);
   const filePath = `${fullSubDir}/${fileName}`;
-  console.log(filePath);
   // 确保目录存在
   await window.$mapi.file.mkdir(fullSubDir);
 
@@ -225,7 +224,6 @@ const loadSoundList = async () => {
       state: item.state
     }));
   } catch (error) {
-    console.error('加载声音克隆列表失败:', error);
     Message.error('加载声音克隆列表失败');
   }
 };
@@ -243,7 +241,6 @@ const handleDelete = async (id: string) => {
       }
     });
   } catch (error) {
-    console.error('删除失败:', error);
     Message.error('删除失败');
   }
 };
@@ -255,7 +252,6 @@ const handleEdit = async (item: SoundCloneItem) => {
     audioText.value = (await AudioCharacterService.get(item.id))?.audio_text || '';
     showCloneVoiceDialog.value = true;
   } catch (error) {
-    console.error('加载编辑数据失败:', error);
     Message.error('加载编辑数据失败');
   }
 };
@@ -284,13 +280,11 @@ const handleSaveCloneVoice = async () => {
 
     // 保存音频文件
     const audioPath = await saveFile(audioFile.value, 'audio');
-    console.log(audioPath);
     // 保存图片文件（如果有）
     let imagePath = '';
     if (imageFile.value) {
       imagePath = await saveFile(imageFile.value, 'images');
     }
-    console.log(imagePath);
     // 保存到数据库
     await AudioCharacterService.create({
       name: name.value,
@@ -321,7 +315,6 @@ const handleSaveCloneVoice = async () => {
     imageFileName.value = '';
 
   } catch (error) {
-    console.error('保存失败:', error);
     Message.error('保存失败');
   }
 };

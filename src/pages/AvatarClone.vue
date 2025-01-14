@@ -44,17 +44,23 @@
         <div class="flex items-center">
           <!-- 头像区域 -->
           <div class="relative w-16 h-16 mr-4">
-            <div v-if="avatar.avatar" class="w-full h-full rounded-lg overflow-hidden">
-              <img :src="avatar.avatar" class="w-full h-full object-cover" />
+            <div v-if="avatar.anchor_backgroud" class="w-full h-full rounded-lg overflow-hidden">
+              <img :src="avatar.anchor_backgroud" class="w-full h-full object-cover" />
             </div>
             <div v-else class="w-full h-full rounded-lg bg-[#1D1E2B] flex items-center justify-center">
               <icon-user class="text-2xl text-gray-400" />
             </div>
           </div>
 
-          <!-- 状态和操作区域 -->
+          <!-- 信息区域 -->
+          <div class="flex-grow">
+            <div class="text-lg font-medium">{{ avatar.anchor_name }}</div>
+            <div class="text-sm text-gray-400">创建时间: {{ new Date(avatar.create_date).toLocaleString() }}</div>
+          </div>
+
+          <!-- 操作区域 -->
           <div class="flex items-center gap-4">
-            <a-tag color="green" v-if="avatar.canUse">可使用</a-tag>
+            <a-tag color="green" v-if="avatar.state === 'normal'">可使用</a-tag>
             <a-button type="text" @click="handleEdit(avatar)">
               <template #icon>
                 <icon-edit />
@@ -81,7 +87,7 @@
             <span>上传形象视频：</span>
           </div>
           <div>
-            <span>上传一段视频文件，用于克隆形象。建议上传视频时长为10-30秒，视频质量清晰，避免多人出现、明显遮挡等情况</span>
+            <span>上传一段视频文件，用于克隆形象。建议上传视频时长为10-30秒，视频质量清晰，避免多人出现、明显遮挡等情况，视频封面将作为主播形象照片</span>
           </div>
           <div class="upload-area" @click="handleVideoClick">
             <div class="upload-placeholder">
@@ -89,6 +95,11 @@
             </div>
             <div v-if="videoFileName" class="upload-filename">{{ videoFileName }}</div>
             <div class="upload-text">支持MP4格式,建议大小不超过50MB</div>
+          </div>
+          <!-- 视频封面预览 -->
+          <div v-if="coverImageUrl" class="mt-4">
+            <div class="text-sm text-gray-400 mb-2">视频封面预览（默认作为主播形象照片）:</div>
+            <img :src="coverImageUrl" class="w-full max-h-[200px] object-contain rounded-lg" />
           </div>
           <input
             type="file"
@@ -119,154 +130,207 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { Modal, Radio, Input, Message } from '@arco-design/web-vue';
 import { IconPlus } from '@arco-design/web-vue/es/icon';
+import AnchorService, { AnchorRecord } from '../service/AnchorService';
 import { v4 as uuidv4 } from 'uuid';
 import { PathManager } from '../utils/pathManager';
-
-interface AvatarCloneItem {
-  id: string;
-  name: string;
-  canUse: boolean;
-  avatar?: string;
-  create_date?: string;
-  video_url?: string;
-  state?: string;
-}
-
-const avatarList = ref<AvatarCloneItem[]>([]);
+const avatarList = ref<AnchorRecord[]>([]);
 const showCloneDialog = ref(false);
 const name = ref('');
 const gender = ref('male');
 const videoFile = ref<File | null>(null);
 const videoFileName = ref('');
 const videoUploadRef = ref<HTMLInputElement | null>(null);
+const coverImageUrl = ref('');
+const videoBlob = ref<Blob | null>(null);
 
-// 保存文件到本地
-const saveFile = async (file: File, subDir: string): Promise<string> => {
-  const buffer = await file.arrayBuffer();
-  const ext = file.name.split('.').pop();
-  const fileName = `${uuidv4()}.${ext}`;
-  const fullSubDir = await window.$mapi.file.fullPath(`${subDir}`);
-  const filePath = `${fullSubDir}/${fileName}`;
-  
-  // 确保目录存在
-  await window.$mapi.file.mkdir(fullSubDir);
-  
-  // 写入文件
-  await window.$mapi.file.writeBuffer(filePath, Buffer.from(buffer), { isFullPath: true });
-  
-  // 转换为标准化的 URL 格式存储到数据库
-  return PathManager.toStoragePath(filePath);
-};
-
-// 加载形象克隆列表
+// 加载形象列表
 const loadAvatarList = async () => {
   try {
-    // TODO: 实现加载列表逻辑
-    avatarList.value = [];
+    avatarList.value = await AnchorService.list();
   } catch (error) {
-    console.error('加载形象克隆列表失败:', error);
-    Message.error('加载形象克隆列表失败');
+    Message.error('加载形象列表失败');
   }
 };
 
-// 删除形象克隆
-const handleDelete = async (id: string) => {
-  try {
-    await Modal.confirm({
-      title: '确认删除',
-      content: '确定要删除这个克隆形象吗？',
-      onOk: async () => {
-        // TODO: 实现删除逻辑
-        Message.success('删除成功');
-        loadAvatarList();
-      }
-    });
-  } catch (error) {
-    console.error('删除失败:', error);
-    Message.error('删除失败');
-  }
-};
-
-// 编辑形象克隆
-const handleEdit = async (item: AvatarCloneItem) => {
-  try {
-    name.value = item.name;
-    showCloneDialog.value = true;
-  } catch (error) {
-    console.error('加载编辑数据失败:', error);
-    Message.error('加载编辑数据失败');
-  }
-};
-
-// 在组件挂载时加载列表
-onMounted(() => {
-  loadAvatarList();
-});
-
-const handleSaveClone = async () => {
-  try {
-    if (!videoFile.value) {
-      Message.error('请上传形象视频');
-      return;
-    }
+// 从视频中提取封面帧
+const extractCoverFrame = async (file: File): Promise<{ dataUrl: string; blob: Blob }> => {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
     
-    if (!name.value) {
-      Message.error('请输入形象昵称');
-      return;
-    }
+    video.preload = 'metadata';
+    video.currentTime = 0;
+    video.autoplay = false;
+    video.muted = true;
     
-    // 保存视频文件
-    const videoPath = await saveFile(videoFile.value, 'videos');
+    video.oncanplay = () => {
+      video.currentTime = 0.1;
+    };
     
-    // TODO: 实现保存到数据库的逻辑
+    video.onseeked = () => {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error('Failed to create blob'));
+          return;
+        }
+        const dataUrl = canvas.toDataURL('image/jpeg');
+        resolve({ dataUrl, blob });
+        
+        URL.revokeObjectURL(video.src);
+        video.remove();
+      }, 'image/jpeg', 0.95);
+    };
     
-    Message.success('保存成功');
-    showCloneDialog.value = false;
-    
-    // 刷新列表
-    await loadAvatarList();
-    
-    // 重置表单
-    name.value = '';
-    gender.value = 'male';
-    videoFile.value = null;
-    videoFileName.value = '';
-    
-  } catch (error) {
-    console.error('保存失败:', error);
-    Message.error('保存失败');
-  }
-};
-
-const handleCancelClone = () => {
-  showCloneDialog.value = false;
-};
-
-const handleVideoUpload = (e: Event) => {
-  const target = e.target as HTMLInputElement;
-  if (target.files && target.files.length > 0) {
-    const file = target.files[0];
-    // 检查文件类型
-    if (!['video/mp4'].includes(file.type)) {
-      Message.error('请上传MP4格式的视频文件');
-      return;
-    }
-    // 检查文件大小（50MB = 50 * 1024 * 1024 bytes）
-    if (file.size > 50 * 1024 * 1024) {
-      Message.error('视频文件大小不能超过50MB');
-      return;
-    }
-    videoFile.value = file;
-    videoFileName.value = file.name;
-  }
+    video.src = URL.createObjectURL(file);
+  });
 };
 
 const handleVideoClick = () => {
   videoUploadRef.value?.click();
 };
+
+const handleVideoUpload = async (e: Event) => {
+  const target = e.target as HTMLInputElement;
+  if (target.files && target.files.length > 0) {
+    const file = target.files[0];
+    if (!['video/mp4'].includes(file.type)) {
+      Message.error('请上传MP4格式的视频文件');
+      target.value = '';
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      Message.error('视频文件大小不能超过50MB');
+      target.value = '';
+      return;
+    }
+    videoFile.value = file;
+    videoFileName.value = file.name;
+    
+    try {
+      const { dataUrl, blob } = await extractCoverFrame(file);
+      coverImageUrl.value = dataUrl;
+      videoBlob.value = blob;
+    } catch (error) {
+      Message.error('提取视频封面失败');
+    }
+    
+    target.value = '';
+  }
+};
+
+const handleSaveClone = async () => {
+  try {
+    if (!name.value) {
+      Message.warning('请输入形象昵称');
+      return;
+    }
+    if (!videoFile.value) {
+      Message.warning('请上传形象视频');
+      return;
+    }
+    if (!videoBlob.value) {
+      Message.warning('请等待视频封面生成');
+      return;
+    }
+
+    const fileName = `avatar/${uuidv4()}.jpg`;
+    // 获取完整路径
+    const fullPath = await window.$mapi.file.fullPath(fileName);
+    try {
+    
+      // 确保目录存在
+      await window.$mapi.file.mkdir('avatar');
+      
+
+      
+      const arrayBuffer = await videoBlob.value.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      await window.$mapi.file.writeBuffer(fullPath, uint8Array, {isFullPath:true});
+  
+    } catch (error) {
+      Message.error('保存图片失败');
+      return;
+    }
+    
+    await AnchorService.create({
+      anchor_name: name.value,
+      anchor_backgroud: PathManager.toStoragePath(fullPath),
+      state: 'normal',
+      creator: 'myself',
+      updater: 'myself'
+    });
+
+    Message.success('保存成功');
+    showCloneDialog.value = false;
+    await loadAvatarList();
+    resetForm();
+    
+  } catch (error) {
+    Message.error('保存失败');
+  }
+};
+
+// 编辑形象
+const handleEdit = async (record: AnchorRecord) => {
+  name.value = record.anchor_name;
+  // 如果有背景图,则显示
+  if (record.anchor_backgroud) {
+    coverImageUrl.value = record.anchor_backgroud;
+  }
+  showCloneDialog.value = true;
+};
+
+// 删除形象
+const handleDelete = async (id: string) => {
+  Modal.confirm({
+    title: '确认删除',
+    content: '确定要删除这个形象吗？',
+    onOk: async () => {
+      try {
+        await AnchorService.delete(id);
+        Message.success('删除成功');
+        await loadAvatarList();
+      } catch (error) {
+        Message.error('删除失败');
+      }
+    }
+  });
+};
+
+const handleCancelClone = () => {
+  showCloneDialog.value = false;
+  resetForm();
+};
+
+// 重置表单所有状态
+const resetForm = () => {
+  name.value = '';
+  gender.value = 'male';
+  videoFile.value = null;
+  videoFileName.value = '';
+  coverImageUrl.value = '';
+};
+
+// 监听对话框显示状态
+watch(showCloneDialog, (newValue) => {
+  if (newValue) {
+    // 打开对话框时重置表单
+    resetForm();
+  }
+});
+
+onMounted(() => {
+  loadAvatarList();
+});
 </script>
 
 <style scoped>

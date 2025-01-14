@@ -1218,7 +1218,7 @@ const handleStartClone = async () => {
           <div class="w-[600px] mx-auto">
             <div class="aspect-video rounded-lg flex items-center justify-center bg-gray-50 overflow-hidden">
               <template v-if="selectedAnchor">
-                <img :src="getImagePath(selectedAnchor.anchor_backgroud)"
+                <img :src="selectedAnchor.anchor_backgroud"
                     :alt="selectedAnchor.anchor_name"
                     class="w-full h-full object-contain" 
                 />
@@ -1610,7 +1610,7 @@ const handleStartClone = async () => {
                class="flex flex-col cursor-pointer"
                @click="handleAnchorSelect(anchor)">
             <div class="aspect-[3/4] rounded-lg overflow-hidden relative">
-              <img :src="getImagePath(anchor.anchor_backgroud)"
+              <img :src="anchor.anchor_backgroud"
                    :alt="anchor.anchor_name"
                    class="w-full h-full object-cover"
               />
