@@ -98,19 +98,32 @@
           <div>
             <span>上传一段音频文件，用于克隆声音。建议上传音频时长为10-30秒，音频质量大于音频的时长，避免多人对话、明显杂音、噪音等情况</span>
           </div>
-          <div class="image-upload">
+          <div class="image-upload" @click="handleAudioClick">
             <div class="upload-placeholder">
               <icon-plus />
             </div>
+            <div v-if="audioFileName" class="upload-filename">{{ audioFileName }}</div>
             <div class="upload-text">支持WAV/MP3/M4A格式,建议大小不超过2MB</div>
           </div>
+          <input
+            type="file"
+            id="audioUpload"
+            ref="audioUploadRef"
+            accept=".wav,.mp3,.m4a"
+            class="hidden"
+            @change="handleAudioUpload"
+          />
         </div>
         <div class="mb-4">
           <div>
             <span>音频文件对应的文字内容：</span>
           </div>
           <div>
-            <a-textarea placeholder="请输入音频文件对应的文字内容" :auto-size="{ minRows: 3, maxRows: 6 }" />
+            <a-textarea 
+              v-model="audioText"
+              placeholder="请输入音频文件对应的文字内容" 
+              :auto-size="{ minRows: 3, maxRows: 6 }" 
+            />
           </div>
         </div>
         <div class="mb-4">
@@ -120,12 +133,21 @@
           <div>
             <span>上传音频者的图片，用作克隆声音的封面</span>
           </div>
-          <div class="image-upload">
+          <div class="image-upload" @click="handleImageClick">
             <div class="upload-placeholder">
               <icon-plus />
             </div>
+            <div v-if="imageFileName" class="upload-filename">{{ imageFileName }}</div>
             <div class="upload-text">支持格式:JPG/PNG/JPEG,建议大小不超过5MB</div>
           </div>
+          <input
+            type="file"
+            id="imageUpload"
+            ref="imageUploadRef"
+            accept=".jpg,.jpeg,.png"
+            class="hidden"
+            @change="handleImageUpload"
+          />
         </div>
         <div class="mb-4">
           <div class="flex items-center">
@@ -147,9 +169,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { Modal, Radio, Input, Select, Option } from '@arco-design/web-vue';
+import { ref, onMounted } from 'vue';
+import { Modal, Radio, Input, Select, Option, Message } from '@arco-design/web-vue';
 import { IconPlus } from '@arco-design/web-vue/es/icon';
+import { v4 as uuidv4 } from 'uuid';
+import AudioCharacterService from '../service/AudioCharacterService';
+import { PathManager } from '../utils/pathManager';
 
 interface SoundCloneItem {
   id: string;
@@ -180,12 +205,140 @@ const gender = ref('male');
 const language = ref('普通话');
 const voiceId = ref('');
 
-const handleSaveCloneVoice = () => {
-  // 保存逻辑
+const audioFile = ref<File | null>(null);
+const audioFileName = ref('');
+const imageFile = ref<File | null>(null);
+const imageFileName = ref('');
+
+const audioUploadRef = ref<HTMLInputElement | null>(null);
+const imageUploadRef = ref<HTMLInputElement | null>(null);
+
+const audioText = ref('');
+
+// 保存文件到本地
+const saveFile = async (file: File, subDir: string): Promise<string> => {
+  const buffer = await file.arrayBuffer();
+  const ext = file.name.split('.').pop();
+  const fileName = `${uuidv4()}.${ext}`;
+  const filePath = await window.$mapi.file.fullPath(`${subDir}/${fileName}`);
+  
+  // 确保目录存在
+  await window.$mapi.file.mkdir(subDir);
+  
+  // 写入文件
+  await window.$mapi.file.writeBuffer(filePath, Buffer.from(buffer));
+  
+  // 转换为标准化的 URL 格式存储到数据库
+  return PathManager.toStoragePath(filePath);
+};
+
+
+const handleSaveCloneVoice = async () => {
+  try {
+    if (!audioFile.value) {
+      Message.error('请上传音频文件');
+      return;
+    }
+    
+    if (!name.value) {
+      Message.error('请输入音频源昵称');
+      return;
+    }
+    
+    if (!audioText.value) {
+      Message.error('请输入音频文件对应的文字内容');
+      return;
+    }
+    
+    // 保存音频文件
+    const audioPath = await saveFile(audioFile.value, 'audio');
+    
+    // 保存图片文件（如果有）
+    let imagePath = '';
+    if (imageFile.value) {
+      imagePath = await saveFile(imageFile.value, 'images');
+    }
+    
+    // 保存到数据库
+    await AudioCharacterService.create({
+      name: name.value,
+      gender_id: gender.value === 'male' ? 1 : 2,
+      language_id: 1, // 默认为普通话
+      state: 'normal',
+      audio_text: audioText.value,
+      configType: 1,
+      version: 1,
+      image_url: imagePath,
+      audio_url: audioPath,
+      creator: 'system',
+    });
+    
+    Message.success('保存成功');
+    showCloneVoiceDialog.value = false;
+    
+    // 重置表单
+    name.value = '';
+    gender.value = 'male';
+    audioText.value = '';
+    audioFile.value = null;
+    audioFileName.value = '';
+    imageFile.value = null;
+    imageFileName.value = '';
+    
+  } catch (error) {
+    console.error('保存失败:', error);
+    Message.error('保存失败');
+  }
 };
 
 const handleCancelCloneVoice = () => {
   showCloneVoiceDialog.value = false;
+};
+
+const handleAudioUpload = (e: Event) => {
+  const target = e.target as HTMLInputElement;
+  if (target.files && target.files.length > 0) {
+    const file = target.files[0];
+    // 检查文件类型
+    if (!['audio/wav', 'audio/mp3', 'audio/m4a', 'audio/mpeg'].includes(file.type)) {
+      Message.error('请上传WAV/MP3/M4A格式的音频文件');
+      return;
+    }
+    // 检查文件大小（2MB = 2 * 1024 * 1024 bytes）
+    if (file.size > 2 * 1024 * 1024) {
+      Message.error('音频文件大小不能超过5MB');
+      return;
+    }
+    audioFile.value = file;
+    audioFileName.value = file.name;
+  }
+};
+
+const handleImageUpload = (e: Event) => {
+  const target = e.target as HTMLInputElement;
+  if (target.files && target.files.length > 0) {
+    const file = target.files[0];
+    // 检查文件类型
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      Message.error('请上传JPG/PNG/JPEG格式的图片');
+      return;
+    }
+    // 检查文件大小（5MB = 5 * 1024 * 1024 bytes）
+    if (file.size > 5 * 1024 * 1024) {
+      Message.error('图片大小不能超过5MB');
+      return;
+    }
+    imageFile.value = file;
+    imageFileName.value = file.name;
+  }
+};
+
+const handleAudioClick = () => {
+  audioUploadRef.value?.click();
+};
+
+const handleImageClick = () => {
+  imageUploadRef.value?.click();
 };
 </script>
 
@@ -207,6 +360,13 @@ const handleCancelCloneVoice = () => {
   border: 1px dashed #ccc;
   padding: 20px;
   border-radius: 8px;
+  cursor: pointer;
+}
+
+.upload-filename {
+  margin-top: 8px;
+  font-size: 14px;
+  color: #165DFF;
 }
 
 .upload-placeholder {
@@ -218,5 +378,9 @@ const handleCancelCloneVoice = () => {
   margin-top: 8px;
   font-size: 12px;
   color: #666;
+}
+
+.hidden {
+  display: none;
 }
 </style>
