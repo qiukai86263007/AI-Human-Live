@@ -417,6 +417,23 @@ const versions = [
                     ]);
                 }
             }
+
+            // 创建火山引擎配置表
+            await db.execute(`CREATE TABLE IF NOT EXISTS hs_engine_config (
+                id VARCHAR(255) PRIMARY KEY,
+                account VARCHAR(255),
+                app_key VARCHAR(255),
+                access_key_secret VARCHAR(255),
+                access_key_id VARCHAR(255),
+                state VARCHAR(255),
+                create_date TIMESTAMP,
+                creator VARCHAR(255),
+                updater VARCHAR(255),
+                update_date TIMESTAMP,
+                configType INTEGER,
+                hsKeyid VARCHAR(255),
+                hsAccessKey VARCHAR(255)
+            )`);
         }
     }
 ]

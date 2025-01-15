@@ -10,11 +10,11 @@
           </template>
           操作手册
         </a-button>
-        <a-button type="outline" status="success">
+        <a-button type="outline" status="success" @click="showKeyConfigDialog = true">
           <template #icon>
-            <icon-sound />
+            <icon-lock />
           </template>
-          配置角色
+          配置密钥
         </a-button>
         <a-button type="primary" @click="showCloneVoiceDialog = true">
           <template #icon>
@@ -149,16 +149,70 @@
         </div>
       </div>
     </a-modal>
+
+    <a-modal v-model:visible="showKeyConfigDialog" title="配置密钥" width="500" @ok="handleSaveKeyConfig"
+      @cancel="showKeyConfigDialog = false">
+      <div class="key-config-form">
+        <a-tabs default-active-key="1">
+          <a-tab-pane key="1" title="火山密钥配置">
+            <div class="mb-6">
+              <div class="font-medium mb-2">火山语音技术-服务接口认证信息</div>
+              <div class="mb-4">
+                <div>
+                  <span class="text-red-500 mr-1">*</span>
+                  <span>App Key：</span>
+                </div>
+                <div>
+                  <a-input v-model="keyConfig.app_key" placeholder="请输入App Key" style="width: 400px" />
+                </div>
+              </div>
+              <div class="mb-4">
+                <div>
+                  <span class="text-red-500 mr-1">*</span>
+                  <span>Access Key Secret：</span>
+                </div>
+                <div>
+                  <a-input v-model="keyConfig.access_key_secret" placeholder="请输入Access Key Secret" style="width: 400px" />
+                </div>
+              </div>
+            </div>
+
+            <div class="mb-6">
+              <div class="font-medium mb-2">火山引擎API访问密钥</div>
+              <div class="mb-4">
+                <div>
+                  <span class="text-red-500 mr-1">*</span>
+                  <span>Access Key ID：</span>
+                </div>
+                <div>
+                  <a-input v-model="keyConfig.hsKeyid" placeholder="请输入Access Key ID" style="width: 400px" />
+                </div>
+              </div>
+              <div class="mb-4">
+                <div>
+                  <span class="text-red-500 mr-1">*</span>
+                  <span>Secret Access Key：</span>
+                </div>
+                <div>
+                  <a-input v-model="keyConfig.hsAccessKey" placeholder="请输入Secret Access Key" style="width: 400px" />
+                </div>
+              </div>
+            </div>
+          </a-tab-pane>
+        </a-tabs>
+      </div>
+    </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { Modal, Radio, Input, Select, Option, Message } from '@arco-design/web-vue';
-import { IconPlus } from '@arco-design/web-vue/es/icon';
+import { Modal, Radio, Input, Select, Option, Message, Tabs, TabPane } from '@arco-design/web-vue';
+import { IconPlus, IconLock } from '@arco-design/web-vue/es/icon';
 import { v4 as uuidv4 } from 'uuid';
 import AudioCharacterService from '../service/AudioCharacterService';
 import { PathManager } from '../utils/pathManager';
+import HsEngineConfigService from '../service/HsEngineConfigService';
 
 interface SoundCloneItem {
   id: string;
@@ -190,6 +244,14 @@ const audioUploadRef = ref<HTMLInputElement | null>(null);
 const imageUploadRef = ref<HTMLInputElement | null>(null);
 
 const audioText = ref('');
+
+const showKeyConfigDialog = ref(false);
+const keyConfig = ref({
+  app_key: '',
+  access_key_secret: '',
+  hsKeyid: '',
+  hsAccessKey: ''
+});
 
 // 保存文件到本地
 const saveFile = async (file: File, subDir: string): Promise<string> => {
@@ -256,9 +318,68 @@ const handleEdit = async (item: SoundCloneItem) => {
   }
 };
 
-// 在组件挂载时加载列表
+// 保存密钥配置
+const handleSaveKeyConfig = async () => {
+  try {
+    // 验证所有字段都已填写
+    if (!keyConfig.value.app_key || !keyConfig.value.access_key_secret || 
+        !keyConfig.value.hsKeyid || !keyConfig.value.hsAccessKey) {
+      Message.warning('请填写所有配置项');
+      return;
+    }
+    
+    const defaultConfig = await HsEngineConfigService.getDefault();
+    if (defaultConfig) {
+      // 更新已有配置
+      await HsEngineConfigService.update(defaultConfig.id!, {
+        app_key: keyConfig.value.app_key,
+        access_key_secret: keyConfig.value.access_key_secret,
+        hsKeyid: keyConfig.value.hsKeyid,
+        hsAccessKey: keyConfig.value.hsAccessKey,
+        updater: 'system'
+      });
+    } else {
+      // 创建新配置
+      await HsEngineConfigService.create({
+        app_key: keyConfig.value.app_key,
+        access_key_secret: keyConfig.value.access_key_secret,
+        hsKeyid: keyConfig.value.hsKeyid,
+        hsAccessKey: keyConfig.value.hsAccessKey,
+        state: 'normal',
+        creator: 'system',
+        updater: 'system'
+      });
+    }
+    
+    Message.success('配置保存成功');
+    showKeyConfigDialog.value = false;
+  } catch (error) {
+    console.error('保存配置失败:', error);
+    Message.error('保存配置失败');
+  }
+};
+
+// 加载已保存的配置
+const loadKeyConfig = async () => {
+  try {
+    const config = await HsEngineConfigService.getDefault();
+    if (config) {
+      keyConfig.value = {
+        app_key: config.app_key || '',
+        access_key_secret: config.access_key_secret || '',
+        hsKeyid: config.hsKeyid || '',
+        hsAccessKey: config.hsAccessKey || ''
+      };
+    }
+  } catch (error) {
+    console.error('加载配置失败:', error);
+  }
+};
+
+// 在组件挂载时加载列表和配置
 onMounted(() => {
   loadSoundList();
+  loadKeyConfig();
 });
 
 const handleSaveCloneVoice = async () => {
