@@ -2,6 +2,7 @@ import packageJson from '../package.json';
 import {TimeUtil} from "../electron/lib/util";
 
 const BASE_URL = 'https://aigcpanel.com';
+const HS_URL =  'https://openspeech.bytedance.com'
 
 export const AppConfig = {
     name: 'AI数字人直播系统',
@@ -17,6 +18,10 @@ export const AppConfig = {
     statisticsUrl: `${BASE_URL}/app_manager/collect`,
     guideUrl: `${BASE_URL}/app_manager/guide`,
     helpUrl: `${BASE_URL}/app_manager/help`,
+    hsAPIConfig:{
+        'upload':`${HS_URL}/api/v1/mega_tts/audio/upload`,
+        'status':`${HS_URL}/api/v1/mega_tts/status`
+    },
     basic: {
         userEnable: false,
     },

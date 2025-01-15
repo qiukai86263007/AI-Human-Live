@@ -28,6 +28,37 @@ export interface AudioCharacterRecord {
 class AudioCharacterService {
   tableName = 'audio_character_config';
 
+  // 初始化表
+  async initTable(): Promise<void> {
+    await window.$mapi.db.execute(`
+      CREATE TABLE IF NOT EXISTS ${this.tableName} (
+        id VARCHAR(255) PRIMARY KEY,
+        code INTEGER,
+        name VARCHAR(255),
+        voice_id VARCHAR(255),
+        expire_time TIMESTAMP,
+        token VARCHAR(255),
+        gender_id INTEGER,
+        language_id INTEGER,
+        state VARCHAR(50),
+        app_key VARCHAR(255),
+        access_key_secret VARCHAR(255),
+        access_key_id VARCHAR(255),
+        create_date TIMESTAMP,
+        creator VARCHAR(255),
+        updater VARCHAR(255),
+        update_date TIMESTAMP,
+        configType INTEGER,
+        hsKeyid VARCHAR(255),
+        hsAccessKey VARCHAR(255),
+        version INTEGER,
+        image_url VARCHAR(255),
+        audio_url VARCHAR(255)
+      )
+    `);
+  }
+
+  // 创建记录
   async create(data: AudioCharacterRecord): Promise<string> {
     const id = uuidv4();
     const now = new Date().toISOString();
@@ -54,7 +85,7 @@ class AudioCharacterService {
       data.access_key_id,
       now,
       data.creator || 'system',
-      data.creator || 'system',
+      data.updater || 'system',
       now,
       data.configType || 1,
       data.hsKeyid,
@@ -67,6 +98,7 @@ class AudioCharacterService {
     return id;
   }
 
+  // 更新记录
   async update(id: string, data: Partial<AudioCharacterRecord>): Promise<void> {
     const sets: string[] = [];
     const params: any[] = [];
@@ -88,27 +120,22 @@ class AudioCharacterService {
     await window.$mapi.db.execute(sql, params);
   }
 
+  // 获取记录
   async get(id: string): Promise<AudioCharacterRecord | null> {
-    const sql = `SELECT * FROM ${this.tableName} WHERE id = ? AND state = 'normal'`;
-    const result = await window.$mapi.db.execute(sql, [id]);
-    if (!result || !Array.isArray(result)) {
-      return null;
-    }
-    return result[0] || null;
+    const sql = `SELECT * FROM ${this.tableName} WHERE id = ?`;
+    return await window.$mapi.db.first(sql, [id]);
   }
 
+  // 获取所有记录
   async list(): Promise<AudioCharacterRecord[]> {
     const sql = `SELECT * FROM ${this.tableName} WHERE state = 'normal' ORDER BY create_date DESC`;
-    const result = await window.$mapi.db.execute(sql);
-    if (!result || !Array.isArray(result)) {
-      return [];
-    }
-    return result;
+    return await window.$mapi.db.select(sql);
   }
 
+  // 删除记录
   async delete(id: string): Promise<void> {
-    const sql = `UPDATE ${this.tableName} SET state = ?, update_date = ? WHERE id = ?`;
-    await window.$mapi.db.execute(sql, ['deleted', new Date().toISOString(), id]);
+    const sql = `UPDATE ${this.tableName} SET state = 'deleted', update_date = ? WHERE id = ?`;
+    await window.$mapi.db.execute(sql, [new Date().toISOString(), id]);
   }
 }
 

@@ -10,7 +10,7 @@
           </template>
           操作手册
         </a-button>
-        <a-button type="outline" status="success" @click="showKeyConfigDialog = true">
+        <a-button type="outline" status="success" @click="handleShowKeyConfig">
           <template #icon>
             <icon-lock />
           </template>
@@ -41,20 +41,39 @@
     <!-- 声音克隆卡片列表 -->
     <div v-else>
       <div v-for="sound in soundList" :key="sound.id" class="sound-card bg-[#252632] rounded-lg p-4 mb-4">
-        <div class="flex items-center">
-          <!-- 头像区域 -->
-          <div class="relative w-16 h-16 mr-4">
-            <div v-if="sound.avatar" class="w-full h-full rounded-lg overflow-hidden">
-              <img :src="sound.avatar" class="w-full h-full object-cover" />
+        <div class="flex items-center justify-between">
+          <!-- 左侧信息区域 -->
+          <div class="flex items-center">
+            <!-- 头像区域 -->
+            <div class="relative w-16 h-16 mr-4">
+              <div v-if="sound.avatar" class="w-full h-full rounded-lg overflow-hidden">
+                <img :src="sound.avatar" class="w-full h-full object-cover" />
+              </div>
+              <div v-else class="w-full h-full rounded-lg bg-[#1D1E2B] flex items-center justify-center">
+                <icon-user class="text-2xl text-gray-400" />
+              </div>
             </div>
-            <div v-else class="w-full h-full rounded-lg bg-[#1D1E2B] flex items-center justify-center">
-              <icon-user class="text-2xl text-gray-400" />
+            
+            <!-- 基本信息 -->
+            <div class="flex flex-col">
+              <div class="text-lg font-medium mb-2">{{ sound.name }}</div>
+              <div class="flex items-center gap-4 text-sm text-gray-400">
+                <span>创建时间：{{ new Date(sound.create_date || '').toLocaleString() }}</span>
+                <span>性别：{{ sound.gender_id === 1 ? '男' : '女' }}</span>
+                <span>语种：{{ 
+                  sound.language_id === 1 ? '普通话' : 
+                  sound.language_id === 2 ? '英语' : 
+                  sound.language_id === 3 ? '日本语' : '未知'
+                }}</span>
+                <span>版本：{{ sound.configType === 1 ? '字符版' : '并发版' }}</span>
+              </div>
             </div>
           </div>
 
-          <!-- 状态和操作区域 -->
+          <!-- 右侧状态和操作区域 -->
           <div class="flex items-center gap-4">
             <a-tag color="green" v-if="sound.canUse">可使用</a-tag>
+            <a-tag color="red" v-else>不可用</a-tag>
             <a-button type="text" @click="handleEdit(sound)">
               <template #icon>
                 <icon-edit />
@@ -190,7 +209,7 @@
     </a-modal>
 
     <a-modal v-model:visible="showKeyConfigDialog" title="配置密钥" width="500" @ok="handleSaveKeyConfig"
-      @cancel="showKeyConfigDialog = false">
+      @cancel="handleCancelKeyConfig">
       <div class="key-config-form">
         <a-tabs default-active-key="1">
           <a-tab-pane key="1" title="火山密钥配置">
@@ -199,19 +218,19 @@
               <div class="mb-4">
                 <div>
                   <span class="text-red-500 mr-1">*</span>
-                  <span>App Key：</span>
+                  <span>App ID：</span>
                 </div>
                 <div>
-                  <a-input v-model="keyConfig.app_key" placeholder="请输入App Key" style="width: 400px" />
+                  <a-input v-model="keyConfig.app_key" placeholder="请输入App ID" style="width: 400px" />
                 </div>
               </div>
               <div class="mb-4">
                 <div>
                   <span class="text-red-500 mr-1">*</span>
-                  <span>Access Key Secret：</span>
+                  <span>Access Token：</span>
                 </div>
                 <div>
-                  <a-input v-model="keyConfig.access_key_secret" placeholder="请输入Access Key Secret" style="width: 400px" />
+                  <a-input v-model="keyConfig.access_key_secret" placeholder="请输入Access Token" style="width: 400px" />
                 </div>
               </div>
             </div>
@@ -252,6 +271,8 @@ import { v4 as uuidv4 } from 'uuid';
 import AudioCharacterService from '../service/AudioCharacterService';
 import { PathManager } from '../utils/pathManager';
 import HsEngineConfigService from '../service/HsEngineConfigService';
+import { doRequest } from '../utils/HsSignUtils';
+import { train, getStatus } from '../utils/VoiceCloneUtils';
 
 interface SoundCloneItem {
   id: string;
@@ -263,6 +284,10 @@ interface SoundCloneItem {
   audio_url?: string;
   image_url?: string;
   state?: string;
+  gender_id?: number;
+  language_id?: number;
+  configType?: number;
+  voice_id?: string;
 }
 
 const soundList = ref<SoundCloneItem[]>([]);
@@ -321,7 +346,11 @@ const loadSoundList = async () => {
       create_date: item.create_date,
       audio_url: item.audio_url,
       image_url: item.image_url,
-      state: item.state
+      state: item.state,
+      gender_id: item.gender_id,
+      language_id: item.language_id,
+      configType: item.configType,
+      voice_id: item.voice_id
     }));
   } catch (error) {
     Message.error('加载声音克隆列表失败');
@@ -349,6 +378,10 @@ const handleDelete = async (id: string) => {
 const handleEdit = async (item: SoundCloneItem) => {
   try {
     name.value = item.name;
+    gender.value = item.gender_id === 1 ? 'male' : 'female';
+    language.value = item.language_id?.toString() || '1';
+    voiceId.value = item.voice_id || '';
+    version.value = item.configType?.toString() || '1';
     showCloneVoiceDialog.value = true;
   } catch (error) {
     Message.error('加载编辑数据失败');
@@ -391,7 +424,6 @@ const handleSaveKeyConfig = async () => {
     Message.success('配置保存成功');
     showKeyConfigDialog.value = false;
   } catch (error) {
-    console.error('保存配置失败:', error);
     Message.error('保存配置失败');
   }
 };
@@ -407,7 +439,7 @@ const loadKeyConfig = async () => {
         hsKeyid: config.hsKeyid || '',
         hsAccessKey: config.hsAccessKey || ''
       };
-    }
+    } 
   } catch (error) {
     console.error('加载配置失败:', error);
   }
@@ -442,11 +474,19 @@ const handleSaveCloneVoice = async () => {
       return;
     }
 
+    // 获取配置
+    const config = await HsEngineConfigService.getDefault();
+    if (!config || !config.app_key || !config.access_key_secret || !config.hsKeyid || !config.hsAccessKey) {
+      Message.error('请先配置火山引擎密钥');
+      return;
+    }
+
     // 保存音频文件
     const audioPath = await saveFile(audioFile.value, 'audio');
     // 保存图片文件
     const imagePath = await saveFile(imageFile.value, 'images');
     // 保存到数据库
+    await train(config.app_key,config.access_key_secret,PathManager.fromStoragePath(audioPath),voiceId.value);
     await AudioCharacterService.create({
       name: name.value,
       gender_id: gender.value === 'male' ? 1 : 2,
@@ -480,11 +520,22 @@ const handleSaveCloneVoice = async () => {
 
   } catch (error) {
     Message.error('保存失败');
+    
   }
 };
 
 const handleCancelCloneVoice = () => {
   showCloneVoiceDialog.value = false;
+  // 重置所有表单数据
+  name.value = '';
+  gender.value = 'male';
+  language.value = '1';
+  voiceId.value = '';
+  version.value = '1';
+  audioFile.value = null;
+  audioFileName.value = '';
+  imageFile.value = null;
+  imageFileName.value = '';
 };
 
 const handleAudioUpload = (e: Event) => {
@@ -492,7 +543,8 @@ const handleAudioUpload = (e: Event) => {
   if (target.files && target.files.length > 0) {
     const file = target.files[0];
     // 检查文件类型
-    if (!['audio/wav', 'audio/mp3', 'audio/m4a', 'audio/mpeg'].includes(file.type)) {
+    console.log(file.type);
+    if (!['audio/wav', 'audio/mp3', 'audio/m4a', 'audio/x-m4a'].includes(file.type)) {
       Message.error('请上传WAV/MP3/M4A格式的音频文件');
       return;
     }
@@ -531,6 +583,24 @@ const handleAudioClick = () => {
 
 const handleImageClick = () => {
   imageUploadRef.value?.click();
+};
+
+// 显示密钥配置对话框
+const handleShowKeyConfig = async () => {
+  showKeyConfigDialog.value = true;
+  await loadKeyConfig();
+};
+
+// 取消密钥配置
+const handleCancelKeyConfig = () => {
+  showKeyConfigDialog.value = false;
+  // 重置配置
+  keyConfig.value = {
+    app_key: '',
+    access_key_secret: '',
+    hsKeyid: '',
+    hsAccessKey: ''
+  };
 };
 </script>
 
