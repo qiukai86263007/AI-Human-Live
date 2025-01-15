@@ -2,46 +2,63 @@ import { v4 as uuidv4 } from 'uuid';
 
 export interface AudioCharacterRecord {
   id?: string;
+  code?: number;
   name?: string;
+  voice_id?: string;
+  expire_time?: string;
+  token?: string;
   gender_id?: number;
   language_id?: number;
   state?: string;
-  audio_text?: string;
+  app_key?: string;
+  access_key_secret?: string;
+  access_key_id?: string;
   create_date?: string;
   creator?: string;
   updater?: string;
   update_date?: string;
   configType?: number;
+  hsKeyid?: string;
+  hsAccessKey?: string;
   version?: number;
   image_url?: string;
   audio_url?: string;
 }
 
 class AudioCharacterService {
-  tableName = 'audio_character';
+  tableName = 'audio_character_config';
 
   async create(data: AudioCharacterRecord): Promise<string> {
     const id = uuidv4();
     const now = new Date().toISOString();
 
     const sql = `INSERT INTO ${this.tableName} (
-      id, name, gender_id, language_id, state,
-      audio_text, create_date, creator, updater,
-      update_date, configType, version, image_url, audio_url
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      id, code, name, voice_id, expire_time, token,
+      gender_id, language_id, state, app_key, access_key_secret,
+      access_key_id, create_date, creator, updater, update_date,
+      configType, hsKeyid, hsAccessKey, version, image_url, audio_url
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
     await window.$mapi.db.execute(sql, [
       id,
+      data.code || 0,
       data.name,
+      data.voice_id,
+      data.expire_time,
+      data.token,
       data.gender_id,
       data.language_id,
       data.state || 'normal',
-      data.audio_text,
+      data.app_key,
+      data.access_key_secret,
+      data.access_key_id,
       now,
       data.creator || 'system',
       data.creator || 'system',
       now,
-      data.configType,
+      data.configType || 1,
+      data.hsKeyid,
+      data.hsAccessKey,
       data.version || 1,
       data.image_url,
       data.audio_url
@@ -73,12 +90,20 @@ class AudioCharacterService {
 
   async get(id: string): Promise<AudioCharacterRecord | null> {
     const sql = `SELECT * FROM ${this.tableName} WHERE id = ? AND state = 'normal'`;
-    return await window.$mapi.db.first(sql, [id]);
+    const result = await window.$mapi.db.execute(sql, [id]);
+    if (!result || !Array.isArray(result)) {
+      return null;
+    }
+    return result[0] || null;
   }
 
   async list(): Promise<AudioCharacterRecord[]> {
     const sql = `SELECT * FROM ${this.tableName} WHERE state = 'normal' ORDER BY create_date DESC`;
-    return await window.$mapi.db.select(sql);
+    const result = await window.$mapi.db.execute(sql);
+    if (!result || !Array.isArray(result)) {
+      return [];
+    }
+    return result;
   }
 
   async delete(id: string): Promise<void> {

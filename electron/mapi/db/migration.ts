@@ -327,18 +327,26 @@ const versions = [
                 live_room_id VARCHAR(100),
                 anchor_name VARCHAR(100)
             )`);
-            await db.execute(`CREATE TABLE IF NOT EXISTS audio_character (
+            await db.execute(`CREATE TABLE IF NOT EXISTS audio_character_config (
                 id VARCHAR(255) PRIMARY KEY,
+                code INTEGER NOT NULL,
                 name VARCHAR(255),
+                voice_id VARCHAR(255),
+                expire_time TIMESTAMP,
+                token VARCHAR(255),
                 gender_id INTEGER,
                 language_id INTEGER,
                 state VARCHAR(255),
-                audio_text TEXT,
+                app_key VARCHAR(255),
+                access_key_secret VARCHAR(255),
+                access_key_id VARCHAR(255),
                 create_date TIMESTAMP,
                 creator VARCHAR(255),
                 updater VARCHAR(255),
                 update_date TIMESTAMP,
                 configType INTEGER,
+                hsKeyid VARCHAR(255),
+                hsAccessKey VARCHAR(255),
                 version INTEGER,
                 image_url VARCHAR(255),
                 audio_url VARCHAR(255)
