@@ -75,78 +75,117 @@
     <a-modal v-model:visible="showCloneVoiceDialog" title="新建克隆声音" width="500" @ok="handleSaveCloneVoice"
       @cancel="handleCancelCloneVoice">
       <div class="clone-voice-form">
-        <div class="mb-4">
-          <div>
-            <span>上传音频文件：</span>
-          </div>
-          <div>
-            <span>上传一段音频文件，用于克隆声音。建议上传音频时长为10-30秒，音频质量大于音频的时长，避免多人对话、明显杂音、噪音等情况</span>
-          </div>
-          <div class="image-upload" @click="handleAudioClick">
-            <div class="upload-placeholder">
-              <icon-plus />
+        <a-tabs default-active-key="1">
+          <a-tab-pane key="1" title="火山引擎">
+            <div class="mb-4">
+              <div>
+                <span class="text-red-500 mr-1">*</span>
+                <span>上传音频文件：</span>
+              </div>
+              <div>
+                <span>上传一段音频文件，用于克隆声音。建议上传音频时长为10-30秒，音频质量大于音频的时长，避免多人对话、明显杂音、噪音等情况</span>
+              </div>
+              <div class="image-upload" @click="handleAudioClick">
+                <div class="upload-placeholder">
+                  <icon-plus />
+                </div>
+                <div v-if="audioFileName" class="upload-filename">{{ audioFileName }}</div>
+                <div class="upload-text">支持WAV/MP3/M4A格式,建议大小不超过5MB</div>
+              </div>
+              <input
+                type="file"
+                id="audioUpload"
+                ref="audioUploadRef"
+                accept=".wav,.mp3,.m4a"
+                class="hidden"
+                @change="handleAudioUpload"
+              />
             </div>
-            <div v-if="audioFileName" class="upload-filename">{{ audioFileName }}</div>
-            <div class="upload-text">支持WAV/MP3/M4A格式,建议大小不超过5MB</div>
-          </div>
-          <input
-            type="file"
-            id="audioUpload"
-            ref="audioUploadRef"
-            accept=".wav,.mp3,.m4a"
-            class="hidden"
-            @change="handleAudioUpload"
-          />
-        </div>
-        <div class="mb-4">
-          <div>
-            <span>音频文件对应的文字内容：</span>
-          </div>
-          <div>
-            <a-textarea
-              v-model="audioText"
-              placeholder="请输入音频文件对应的文字内容"
-              :auto-size="{ minRows: 3, maxRows: 6 }"
-            />
-          </div>
-        </div>
-        <div class="mb-4">
-          <div>
-            <span>上传音频者封面：</span>
-          </div>
-          <div>
-            <span>上传音频者的图片，用作克隆声音的封面</span>
-          </div>
-          <div class="image-upload" @click="handleImageClick">
-            <div class="upload-placeholder">
-              <icon-plus />
+            <div class="mb-4">
+              <div>
+                <span class="text-red-500 mr-1">*</span>
+                <span>上传音频者封面：</span>
+              </div>
+              <div>
+                <span>上传音频者的图片，用作克隆声音的封面</span>
+              </div>
+              <div class="image-upload" @click="handleImageClick">
+                <div class="upload-placeholder">
+                  <icon-plus />
+                </div>
+                <div v-if="imageFileName" class="upload-filename">{{ imageFileName }}</div>
+                <div class="upload-text">支持格式:JPG/PNG/JPEG,建议大小不超过5MB</div>
+              </div>
+              <input
+                type="file"
+                id="imageUpload"
+                ref="imageUploadRef"
+                accept=".jpg,.jpeg,.png"
+                class="hidden"
+                @change="handleImageUpload"
+              />
             </div>
-            <div v-if="imageFileName" class="upload-filename">{{ imageFileName }}</div>
-            <div class="upload-text">支持格式:JPG/PNG/JPEG,建议大小不超过5MB</div>
-          </div>
-          <input
-            type="file"
-            id="imageUpload"
-            ref="imageUploadRef"
-            accept=".jpg,.jpeg,.png"
-            class="hidden"
-            @change="handleImageUpload"
-          />
-        </div>
-        <div class="mb-4">
-          <div class="flex items-center">
-            <span class="w-32 flex-shrink-0">音频源昵称：</span>
-            <a-input v-model="name" placeholder="请输入姓名" style="width: 150px" />
-          </div>
-        </div>
+            <div class="mb-4">
+              <div class="flex items-center">
+                <span class="w-32 flex-shrink-0">
+                  <span class="text-red-500 mr-1">*</span>
+                  <span>音频源昵称：</span>
+                </span>
+                <a-input v-model="name" placeholder="请输入姓名" style="width: 150px" />
+              </div>
+            </div>
 
-        <div class="mb-4">
-          <span>音频者性别：</span>
-          <a-radio-group v-model="gender" class="ml-4">
-            <a-radio value="male">男</a-radio>
-            <a-radio value="female">女</a-radio>
-          </a-radio-group>
-        </div>
+            <div class="mb-4">
+              <div class="flex items-center">
+                <span class="w-32 flex-shrink-0">
+                  <span class="text-red-500 mr-1">*</span>
+                  <span>音调ID：</span>
+                </span>
+                <a-input v-model="voiceId" placeholder="请输入音调ID" style="width: 150px" />
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <div class="flex items-center">
+                <span class="w-32 flex-shrink-0">
+                  <span class="text-red-500 mr-1">*</span>
+                  <span>声音版本：</span>
+                </span>
+                <a-radio-group v-model="version">
+                  <a-radio value="1">字符版</a-radio>
+                  <a-radio value="2">并发版</a-radio>
+                </a-radio-group>
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <div class="flex items-center">
+                <span class="w-32 flex-shrink-0">
+                  <span class="text-red-500 mr-1">*</span>
+                  <span>语种选择：</span>
+                </span>
+                <a-select v-model="language" style="width: 150px">
+                  <a-option value="1">普通话</a-option>
+                  <a-option value="2">英语</a-option>
+                  <a-option value="3">日本语</a-option>
+                </a-select>
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <div class="flex items-center">
+                <span class="w-32 flex-shrink-0">
+                  <span class="text-red-500 mr-1">*</span>
+                  <span>音频者性别：</span>
+                </span>
+                <a-radio-group v-model="gender">
+                  <a-radio value="male">男</a-radio>
+                  <a-radio value="female">女</a-radio>
+                </a-radio-group>
+              </div>
+            </div>
+          </a-tab-pane>
+        </a-tabs>
       </div>
     </a-modal>
 
@@ -232,8 +271,9 @@ const showCloneVoiceDialog = ref(false);
 const selectedPlatform = ref('aliyun');
 const name = ref('');
 const gender = ref('male');
-const language = ref('普通话');
+const language = ref('1');
 const voiceId = ref('');
+const version = ref('1');
 
 const audioFile = ref<File | null>(null);
 const audioFileName = ref('');
@@ -242,8 +282,6 @@ const imageFileName = ref('');
 
 const audioUploadRef = ref<HTMLInputElement | null>(null);
 const imageUploadRef = ref<HTMLInputElement | null>(null);
-
-const audioText = ref('');
 
 const showKeyConfigDialog = ref(false);
 const keyConfig = ref({
@@ -311,7 +349,6 @@ const handleDelete = async (id: string) => {
 const handleEdit = async (item: SoundCloneItem) => {
   try {
     name.value = item.name;
-    audioText.value = (await AudioCharacterService.get(item.id))?.audio_text || '';
     showCloneVoiceDialog.value = true;
   } catch (error) {
     Message.error('加载编辑数据失败');
@@ -384,8 +421,14 @@ onMounted(() => {
 
 const handleSaveCloneVoice = async () => {
   try {
+    // 验证必填项
     if (!audioFile.value) {
       Message.error('请上传音频文件');
+      return;
+    }
+
+    if (!imageFile.value) {
+      Message.error('请上传音频者封面');
       return;
     }
 
@@ -394,30 +437,28 @@ const handleSaveCloneVoice = async () => {
       return;
     }
 
-    if (!audioText.value) {
-      Message.error('请输入音频文件对应的文字内容');
+    if (!voiceId.value) {
+      Message.error('请输入音调ID');
       return;
     }
 
     // 保存音频文件
     const audioPath = await saveFile(audioFile.value, 'audio');
-    // 保存图片文件（如果有）
-    let imagePath = '';
-    if (imageFile.value) {
-      imagePath = await saveFile(imageFile.value, 'images');
-    }
+    // 保存图片文件
+    const imagePath = await saveFile(imageFile.value, 'images');
     // 保存到数据库
     await AudioCharacterService.create({
       name: name.value,
       gender_id: gender.value === 'male' ? 1 : 2,
-      language_id: 1, // 默认为普通话
+      language_id: parseInt(language.value),
+      voice_id: voiceId.value,
       state: 'normal',
-      audio_text: audioText.value,
-      configType: 1,
+      configType: parseInt(version.value),
       version: 1,
       image_url: imagePath,
       audio_url: audioPath,
       creator: 'system',
+      code: 0
     });
 
     Message.success('保存成功');
@@ -429,7 +470,9 @@ const handleSaveCloneVoice = async () => {
     // 重置表单
     name.value = '';
     gender.value = 'male';
-    audioText.value = '';
+    language.value = '1';
+    voiceId.value = '';
+    version.value = '1';
     audioFile.value = null;
     audioFileName.value = '';
     imageFile.value = null;
