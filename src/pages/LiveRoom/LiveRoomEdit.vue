@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { Message, Modal } from '@arco-design/web-vue';
 import PlatformSelector from './PlatformSelector.vue';
@@ -17,6 +17,8 @@ import GiftThankConfigService from '../../service/GiftThankConfigService';
 import RegularInteractionConfigService from '../../service/RegularInteractionConfigService';
 import LiveParameterService from '../../service/LiveParameterService';
 import SelectVoiceDialog from '../../components/Voice/SelectVoiceDialog.vue';
+import SpeechAttributeService, { SpeechAttributeRecord } from '../../service/SpeechAttributeService';
+import AudioCharacterService, { AudioCharacterRecord } from '../../service/AudioCharacterService';
 
 const router = useRouter();
 const route = useRoute();
@@ -544,11 +546,19 @@ const handleChangeVoice = () => {
 const handleVoiceSelect = async (voice: any) => {
   selectedVoice.value = voice;
   try {
-    // 更新当前产品的声音配置
+    // 更新语音属性配置
     if (currentProduct.value?.id) {
-      await ProductService.update(currentProduct.value.id, {
-        voice_id: voice.id,
-        voice_name: voice.name,
+      await SpeechAttributeService.create({
+        type: 'voice',
+        content: JSON.stringify({
+          voicer_id: voice.id,
+          voicer_name: voice.name
+        }),
+        state: 'normal',
+        live_id: route.query.id as string,
+        product_id: currentProduct.value.id,
+        code: voice.code || 0,
+        creator: 'current_user',
         updater: 'current_user'
       });
       Message.success('更新声音成功');
@@ -1050,6 +1060,64 @@ const loadLiveParameter = async () => {
   }
 };
 
+// 添加新的响应式变量
+const isPlaying = ref(false);
+const audioPlayer = ref<HTMLAudioElement | null>(null);
+
+// 修改试听方法
+// 修改试听方法
+const handlePreviewVoice = async () => {
+  if (!selectedVoice.value?.audio_url) {
+    Message.warning('当前主播没有试听音频');
+    return;
+  }
+
+  try {
+    // 如果正在播放，则停止
+    if (isPlaying.value && audioPlayer.value) {
+      audioPlayer.value.pause();
+      // 重置音频播放位置
+      audioPlayer.value.currentTime = 0;
+      audioPlayer.value = null;
+      isPlaying.value = false;
+      return;
+    }
+
+    // 创建音频播放器
+    audioPlayer.value = new Audio(selectedVoice.value.audio_url);
+    
+    // 监听播放结束事件
+    audioPlayer.value.onended = () => {
+      isPlaying.value = false;
+      // 重置音频播放位置
+      if (audioPlayer.value) {
+        audioPlayer.value.currentTime = 0;
+      }
+      audioPlayer.value = null;
+    };
+
+    // 监听播放错误事件
+    audioPlayer.value.onerror = () => {
+      Message.error('音频播放失败');
+      isPlaying.value = false;
+      audioPlayer.value = null;
+    };
+
+    // 开始播放
+    await audioPlayer.value.play();
+    isPlaying.value = true;
+
+  } catch (error) {
+    console.error('试听失败:', error);
+    Message.error('试听失败');
+    isPlaying.value = false;
+    if (audioPlayer.value) {
+      audioPlayer.value.currentTime = 0;
+    }
+    audioPlayer.value = null;
+  }
+};
+
 // 在组件挂载时加载数据
 onMounted(() => {
   loadLiveRoom();
@@ -1057,6 +1125,7 @@ onMounted(() => {
   loadAnchors();
   loadRuleSettings();
   loadLiveParameter();
+  loadCurrentVoice(); // 添加这一行
 });
 
 // 打开平台设置
@@ -1067,6 +1136,56 @@ const handleOpenSettings = () => {
   }
   showPlatformSettings.value = true;
 };
+
+// 在组件卸载时清理音频播放器
+onUnmounted(() => {
+  if (audioPlayer.value) {
+    audioPlayer.value.pause();
+    audioPlayer.value = null;
+  }
+});
+
+// 加载当前主播声音配置
+const loadCurrentVoice = async () => {
+  if (!currentProduct.value?.id || !route.query.id) return;
+  
+  try {
+    // 从speech_attribute表获取voice配置
+    const sql = `SELECT * FROM speech_attribute 
+                 WHERE live_id = ? 
+                 AND product_id = ? 
+                 AND type = 'voice' 
+                 AND state = 'normal'
+                 ORDER BY create_date DESC 
+                 LIMIT 1`;
+                 
+    const voiceConfig = await window.$mapi.db.first(sql, [
+      route.query.id,
+      currentProduct.value.id
+    ]);
+
+    if (voiceConfig) {
+      // 解析content字段获取voice信息
+      const voiceInfo = JSON.parse(voiceConfig.content);
+      selectedVoice.value = {
+        id: voiceInfo.voicer_id,
+        name: voiceInfo.voicer_name,
+        code: voiceConfig.code,
+        // 从AudioCharacterService获取完整的voice信息
+        ...(await AudioCharacterService.get(voiceInfo.voicer_id))
+      };
+    }
+  } catch (error) {
+    console.error('加载主播声音配置失败:', error);
+  }
+};
+
+// 监听currentProduct变化时加载声音配置
+watch(() => currentProduct.value?.id, async (newId) => {
+  if (newId) {
+    await loadCurrentVoice();
+  }
+});
 
 // 开始克隆
 const handleStartClone = async () => {
@@ -1326,6 +1445,13 @@ const handleStartClone = async () => {
                             </div>
                             <a-button size="mini" type="outline" @click="handleChangeVoice">
                               更换主播声音
+                            </a-button>
+                            <a-button size="mini" type="outline" status="success" @click="handlePreviewVoice">
+                              <template #icon>
+                                <icon-play-circle v-if="!isPlaying" />
+                                <icon-pause-circle v-else />
+                              </template>
+                              {{ isPlaying ? '停止' : '试听' }}
                             </a-button>
                           </div>
                         </div>
