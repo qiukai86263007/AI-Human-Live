@@ -427,7 +427,7 @@ const getClonedAudio = async (appKey: string, accessKeySecret: string, voiceId: 
           
           // 确保目录存在
           const fullSubDir = await window.$mapi.file.fullPath(join('audio', 'sound_anchor_cloned'));
-          await window.$mapi.file.mkdir(fullSubDir);
+          await window.$mapi.file.mkdir(fullSubDir, { isFullPath: true });
           
           // 保存文件
           const fileName = `${voiceId}_${name}.wav`;
@@ -475,7 +475,7 @@ const saveFile = async (file: File, subDir: string): Promise<string> => {
   const fullSubDir = await window.$mapi.file.fullPath(`${subDir}`);
   const filePath = join(fullSubDir, fileName);
   // 确保目录存在
-  await window.$mapi.file.mkdir(fullSubDir);
+  await window.$mapi.file.mkdir(fullSubDir,{ isFullPath: true });
 
   // 写入文件
   await window.$mapi.file.writeBuffer(filePath, Buffer.from(buffer),{ isFullPath: true });
