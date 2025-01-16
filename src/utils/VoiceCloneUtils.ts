@@ -46,7 +46,7 @@ export async function train(appid: string, token: string, audioPath: string, spk
     headers,
     body: JSON.stringify(data)
   });
-  await window.$mapi.log.error('Header: ' +  JSON.stringify(headers));
+  await window.$mapi.log.error('Header: ' +  JSON.stringify(headers)+', Body: '+ data.appid+' , '+data.speaker_id);
   console.log("status code = ", response.status);
   
   if (response.status !== 200) {
@@ -57,7 +57,7 @@ export async function train(appid: string, token: string, audioPath: string, spk
   await window.$mapi.log.info("headers = ", JSON.stringify(response.headers));
 }
 
-export async function getStatus(appid: string, token: string, spkId: string): Promise<void> {
+export async function getStatus(appid: string, token: string, spkId: string): Promise<string> {
   const url = `${AppConfig.hsAPIConfig.status}`;
   const headers = {
     "Content-Type": "application/json",
@@ -69,7 +69,7 @@ export async function getStatus(appid: string, token: string, spkId: string): Pr
     appid,
     speaker_id: spkId
   };
-  await window.$mapi.log.error('Header: ' +  JSON.stringify(headers)+', Body: '+ JSON.stringify(body));
+  await window.$mapi.log.info('Header: ' +  JSON.stringify(headers)+', Body: '+ JSON.stringify(body));
   const response = await fetch(url, {
     method: 'POST',
     headers,
@@ -79,7 +79,9 @@ export async function getStatus(appid: string, token: string, spkId: string): Pr
     await window.$mapi.log.error('请求火山引擎状态接口错误:,错误码' +  response.status+', 错误信息:'+ await response.text());
     throw new Error('请求火山引擎状态接口失败');
   }
-  await window.$mapi.log.info('请求火山引擎状态接口成功，返回结果:' + await response.json());
+  const statusData = JSON.stringify(await response.json());
+  await window.$mapi.log.info('请求火山引擎状态接口成功，返回结果:' + statusData);
+  return statusData;
 }
 
 async function encodeAudioFile(filePath: string): Promise<[string, string]> {

@@ -46,8 +46,8 @@
           <div class="flex items-center">
             <!-- 头像区域 -->
             <div class="relative w-16 h-16 mr-4">
-              <div v-if="sound.avatar" class="w-full h-full rounded-lg overflow-hidden">
-                <img :src="sound.avatar" class="w-full h-full object-cover" />
+              <div v-if="sound.image_url" class="w-full h-full rounded-lg overflow-hidden">
+                <img :src="sound.image_url" class="w-full h-full object-cover" />
               </div>
               <div v-else class="w-full h-full rounded-lg bg-[#1D1E2B] flex items-center justify-center">
                 <icon-user class="text-2xl text-gray-400" />
@@ -56,7 +56,7 @@
             
             <!-- 基本信息 -->
             <div class="flex flex-col">
-              <div class="text-lg font-medium mb-2">{{ sound.name }}</div>
+              <div class="text-gray-400 font-medium mb-2">{{ sound.name }}</div>
               <div class="flex items-center gap-4 text-sm text-gray-400">
                 <span>创建时间：{{ new Date(sound.create_date || '').toLocaleString() }}</span>
                 <span>性别：{{ sound.gender_id === 1 ? '男' : '女' }}</span>
@@ -72,8 +72,25 @@
 
           <!-- 右侧状态和操作区域 -->
           <div class="flex items-center gap-4">
-            <a-tag color="green" v-if="sound.canUse">可使用</a-tag>
-            <a-tag color="red" v-else>不可用</a-tag>
+            <template v-if="sound.state === 'normal'">
+              <a-tag color="green">可使用</a-tag>
+              <a-button type="text" @click="handlePlayAudio(sound)">
+                <template #icon>
+                  <icon-play-circle v-if="currentPlayingId !== sound.id" />
+                  <icon-pause-circle v-else />
+                </template>
+                {{ currentPlayingId === sound.id ? '停止' : '试听' }}
+              </a-button>
+            </template>
+            <template v-else-if="sound.state === 'cloning'">
+              <a-tag color="blue">克隆中</a-tag>
+            </template>
+            <template v-else-if="sound.state === 'failed'">
+              <a-tag color="red">克隆失败</a-tag>
+            </template>
+            <template v-else>
+              <a-tag color="gray">未知状态</a-tag>
+            </template>
             <a-button type="text" @click="handleEdit(sound)">
               <template #icon>
                 <icon-edit />
@@ -91,8 +108,12 @@
       </div>
     </div>
 
-    <a-modal v-model:visible="showCloneVoiceDialog" title="新建克隆声音" width="500" @ok="handleSaveCloneVoice"
-      @cancel="handleCancelCloneVoice">
+    <a-modal v-model:visible="showCloneVoiceDialog" title="新建克隆声音" width="500" 
+      :ok-button-props="{ loading: saving }"
+      :cancel-button-props="{ disabled: saving }"
+      :mask-closable="false"
+      :closable="!saving"
+      @before-ok="handleSaveCloneVoice">
       <div class="clone-voice-form">
         <a-tabs default-active-key="1">
           <a-tab-pane key="1" title="火山引擎">
@@ -264,19 +285,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { Modal, Radio, Input, Select, Option, Message, Tabs, TabPane } from '@arco-design/web-vue';
-import { IconPlus, IconLock } from '@arco-design/web-vue/es/icon';
+import { IconPlus, IconLock, IconPlayCircle, IconPauseCircle } from '@arco-design/web-vue/es/icon';
 import { v4 as uuidv4 } from 'uuid';
 import AudioCharacterService from '../service/AudioCharacterService';
 import { PathManager } from '../utils/pathManager';
 import HsEngineConfigService from '../service/HsEngineConfigService';
 import { doRequest } from '../utils/HsSignUtils';
 import { train, getStatus } from '../utils/VoiceCloneUtils';
+import { join } from 'path'
 
 interface SoundCloneItem {
-  id: string;
-  name: string;
+  id?: string;
+  name?: string;
   canUse: boolean;
   level?: string;
   avatar?: string;
@@ -288,6 +310,18 @@ interface SoundCloneItem {
   language_id?: number;
   configType?: number;
   voice_id?: string;
+  code?: number;
+  expire_time?: string;
+  token?: string;
+  app_key?: string;
+  access_key_secret?: string;
+  access_key_id?: string;
+  creator?: string;
+  updater?: string;
+  update_date?: string;
+  hsKeyid?: string;
+  hsAccessKey?: string;
+  version?: number;
 }
 
 const soundList = ref<SoundCloneItem[]>([]);
@@ -316,13 +350,81 @@ const keyConfig = ref({
   hsAccessKey: ''
 });
 
+// 添加编辑状态和当前编辑项ID
+const isEditing = ref(false);
+const editingId = ref<string>('');
+
+// 添加保存状态
+const saving = ref(false);
+
+// 添加音频播放器引用
+const audioPlayer = ref<HTMLAudioElement | null>(null);
+const currentPlayingId = ref<string | null>(null);
+
+// 获取克隆音频的公共函数
+const getClonedAudio = async (appKey: string, accessKeySecret: string, voiceId: string, name:string): Promise<string> => {
+  let retryCount = 0;
+  
+  while (retryCount < 5) {
+    const statusResponse = await getStatus(appKey, accessKeySecret, voiceId);
+    const statusData = JSON.parse(statusResponse);
+    
+    if (statusData.BaseResp.StatusCode === 0) {
+      if (statusData.status === 2 && statusData.demo_audio) {
+        try {
+          const response = await fetch(statusData.demo_audio);
+          const arrayBuffer = await response.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          
+          // 确保目录存在
+          const fullSubDir = await window.$mapi.file.fullPath(join('audio', 'sound_anchor_cloned'));
+          await window.$mapi.file.mkdir(fullSubDir);
+          
+          // 保存文件
+          const fileName = `${voiceId}_${name}.wav`;
+          const filePath = join(fullSubDir, fileName);
+          await window.$mapi.file.writeBuffer(filePath, buffer, { isFullPath: true });
+          
+          return PathManager.toStoragePath(filePath);
+        } catch (error) {
+          console.error('下载克隆音频失败:', error);
+        }
+      } else if (statusData.status === 3) {
+        throw new Error('克隆失败');
+      }
+    }
+    
+    retryCount++;
+    if (retryCount < 3) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
+  
+  throw new Error('克隆音频尚未就绪');
+};
+
+// 重置表单的函数
+const resetForm = () => {
+  name.value = '';
+  gender.value = 'male';
+  language.value = '1';
+  voiceId.value = '';
+  version.value = '1';
+  audioFile.value = null;
+  audioFileName.value = '';
+  imageFile.value = null;
+  imageFileName.value = '';
+  isEditing.value = false;
+  editingId.value = '';
+};
+
 // 保存文件到本地
 const saveFile = async (file: File, subDir: string): Promise<string> => {
   const buffer = await file.arrayBuffer();
   const ext = file.name.split('.').pop();
   const fileName = `${uuidv4()}.${ext}`;
   const fullSubDir = await window.$mapi.file.fullPath(`${subDir}`);
-  const filePath = `${fullSubDir}/${fileName}`;
+  const filePath = join(fullSubDir, fileName);
   // 确保目录存在
   await window.$mapi.file.mkdir(fullSubDir);
 
@@ -337,28 +439,50 @@ const saveFile = async (file: File, subDir: string): Promise<string> => {
 const loadSoundList = async () => {
   try {
     const list = await AudioCharacterService.list();
-    soundList.value = list.map(item => ({
-      id: item.id || '',
-      name: item.name || '',
-      canUse: item.state === 'normal',
-      level: 'L',
-      avatar: item.image_url,
-      create_date: item.create_date,
-      audio_url: item.audio_url,
-      image_url: item.image_url,
-      state: item.state,
-      gender_id: item.gender_id,
-      language_id: item.language_id,
-      configType: item.configType,
-      voice_id: item.voice_id
+    const soundListWithStatus = await Promise.all(list.map(async item => {
+      try {
+        const statusResponse = await getStatus(item.app_key!, item.access_key_secret!, item.voice_id!);
+        const statusData = JSON.parse(statusResponse);
+        let state = 'unknown';
+        
+        if (statusData.BaseResp.StatusCode === 0) {
+          switch (statusData.status) {
+            case 2:
+              state = 'normal';
+              break;
+            case 1:
+              state = 'cloning';
+              break;
+            case 3:
+              state = 'failed';
+              break;
+            default:
+              state = 'unknown';
+          }
+        }
+        return {
+          ...item,
+          state: state,
+          canUse: state === 'normal'
+        };
+      } catch (error) {
+        console.error('获取声音状态失败:', error);
+        return {
+          ...item,
+          state: 'unknown',
+          canUse: false
+        };
+      }
     }));
+    soundList.value = soundListWithStatus;
   } catch (error) {
-    Message.error('加载声音克隆列表失败');
+    console.error('加载声音列表失败:', error);
   }
 };
 
 // 删除声音克隆
-const handleDelete = async (id: string) => {
+const handleDelete = async (id?: string) => {
+  if (!id) return;
   try {
     await Modal.confirm({
       title: '确认删除',
@@ -376,11 +500,14 @@ const handleDelete = async (id: string) => {
 
 // 编辑声音克隆
 const handleEdit = async (item: SoundCloneItem) => {
+  if (!item.id || !item.name || !item.voice_id) return;
   try {
+    isEditing.value = true;
+    editingId.value = item.id;
     name.value = item.name;
     gender.value = item.gender_id === 1 ? 'male' : 'female';
     language.value = item.language_id?.toString() || '1';
-    voiceId.value = item.voice_id || '';
+    voiceId.value = item.voice_id;
     version.value = item.configType?.toString() || '1';
     showCloneVoiceDialog.value = true;
   } catch (error) {
@@ -451,26 +578,20 @@ onMounted(() => {
   loadKeyConfig();
 });
 
-const handleSaveCloneVoice = async () => {
+// 修改保存函数
+const handleSaveCloneVoice = async (done: (closed: boolean) => void) => {
+  saving.value = true;
   try {
     // 验证必填项
-    if (!audioFile.value) {
-      Message.error('请上传音频文件');
-      return;
-    }
-
-    if (!imageFile.value) {
-      Message.error('请上传音频者封面');
-      return;
-    }
-
     if (!name.value) {
       Message.error('请输入音频源昵称');
+      done(false);
       return;
     }
 
     if (!voiceId.value) {
       Message.error('请输入音调ID');
+      done(false);
       return;
     }
 
@@ -478,49 +599,84 @@ const handleSaveCloneVoice = async () => {
     const config = await HsEngineConfigService.getDefault();
     if (!config || !config.app_key || !config.access_key_secret || !config.hsKeyid || !config.hsAccessKey) {
       Message.error('请先配置火山引擎密钥');
+      done(false);
       return;
     }
 
-    // 保存音频文件
-    const audioPath = await saveFile(audioFile.value, 'audio');
-    // 保存图片文件
-    const imagePath = await saveFile(imageFile.value, 'images');
-    // 保存到数据库
-    await train(config.app_key,config.access_key_secret,PathManager.fromStoragePath(audioPath),voiceId.value);
-    await AudioCharacterService.create({
-      name: name.value,
-      gender_id: gender.value === 'male' ? 1 : 2,
-      language_id: parseInt(language.value),
-      voice_id: voiceId.value,
-      state: 'normal',
-      configType: parseInt(version.value),
-      version: 1,
-      image_url: imagePath,
-      audio_url: audioPath,
-      creator: 'system',
-      code: 0
-    });
+    let clonedAudioPath = '';
 
-    Message.success('保存成功');
-    showCloneVoiceDialog.value = false;
+    try {
+      if (!isEditing.value) {
+        // 新建模式的验证
+        if (!audioFile.value || !imageFile.value) {
+          Message.error('请上传音频文件和封面图片');
+          done(false);
+          return;
+        }
 
-    // 刷新列表
-    await loadSoundList();
+        // 保存文件
+        const audioPath = await saveFile(audioFile.value, join('audio', 'sound_anchor_original'));
+        const imagePath = await saveFile(imageFile.value, join('images', 'sound_anchor_cover'));
+        
+        // 训练
+        await train(config.app_key, config.access_key_secret, PathManager.fromStoragePath(audioPath), voiceId.value);
+        
+        // 获取克隆音频
+        clonedAudioPath = await getClonedAudio(config.app_key, config.access_key_secret, voiceId.value,name.value);
 
-    // 重置表单
-    name.value = '';
-    gender.value = 'male';
-    language.value = '1';
-    voiceId.value = '';
-    version.value = '1';
-    audioFile.value = null;
-    audioFileName.value = '';
-    imageFile.value = null;
-    imageFileName.value = '';
+        // 创建记录
+        await AudioCharacterService.create({
+          name: name.value,
+          gender_id: gender.value === 'male' ? 1 : 2,
+          language_id: parseInt(language.value),
+          voice_id: voiceId.value,
+          state: 'normal',
+          configType: parseInt(version.value),
+          version: 1,
+          image_url: imagePath,
+          audio_url: clonedAudioPath,
+          creator: 'system',
+          code: 0,
+          app_key: config.app_key,
+          access_key_secret: config.access_key_secret,
+          access_key_id: config.access_key_secret,
+          hsKeyid: config.hsKeyid,
+          hsAccessKey: config.hsAccessKey
+        });
+      } else {
+        // 编辑模式
+        // 获取克隆音频
+        clonedAudioPath = await getClonedAudio(config.app_key, config.access_key_secret, voiceId.value,name.value);
 
+        // 更新记录
+        await AudioCharacterService.update(editingId.value, {
+          name: name.value,
+          gender_id: gender.value === 'male' ? 1 : 2,
+          language_id: parseInt(language.value),
+          voice_id: voiceId.value,
+          configType: parseInt(version.value),
+          audio_url: clonedAudioPath,
+          updater: 'system'
+        });
+      }
+
+      Message.success(isEditing.value ? '更新成功' : '保存成功');
+      resetForm();
+      await loadSoundList();
+      done(true);
+    } catch (error) {
+      if (error instanceof Error) {
+        Message.error(error.message);
+      } else {
+        Message.error(isEditing.value ? '更新失败' : '保存失败');
+      }
+      done(false);
+    }
   } catch (error) {
-    Message.error('保存失败');
-    
+    Message.error('操作失败');
+    done(false);
+  } finally {
+    saving.value = false;
   }
 };
 
@@ -602,6 +758,68 @@ const handleCancelKeyConfig = () => {
     hsAccessKey: ''
   };
 };
+
+// 添加试听函数
+const handlePlayAudio = async (sound: SoundCloneItem) => {
+  try {
+    if (!sound.audio_url) {
+      Message.error('音频文件不存在');
+      return;
+    }
+
+    // 如果正在播放同一个音频，则停止播放
+    if (currentPlayingId.value === sound.id && audioPlayer.value?.paused === false) {
+      audioPlayer.value?.pause();
+      audioPlayer.value.currentTime = 0;
+      currentPlayingId.value = null;
+      return;
+    }
+
+    // 如果正在播放其他音频，先停止
+    if (audioPlayer.value && !audioPlayer.value.paused) {
+      audioPlayer.value.pause();
+      audioPlayer.value.currentTime = 0;
+    }
+
+    // 获取音频文件的完整路径
+    const audioPath = PathManager.fromStoragePath(sound.audio_url);
+    
+    try {
+      // 读取音频文件
+      const buffer = await window.$mapi.file.readBuffer(audioPath, { isFullPath: true });
+      
+      // 创建Blob对象，指定MIME类型
+      const blob = new Blob([buffer], { type: 'audio/wav' });
+      const audioUrl = URL.createObjectURL(blob);
+
+      // 创建新的音频播放器
+      audioPlayer.value = new Audio(audioUrl);
+      currentPlayingId.value = sound.id || null;
+
+      // 播放结束时清理
+      audioPlayer.value.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        currentPlayingId.value = null;
+      };
+
+      // 开始播放
+      await audioPlayer.value.play();
+    } catch (error) {
+      console.error('读取音频文件失败:', error);
+      throw error;
+    }
+  } catch (error) {
+    Message.error('音频播放失败: ' + error);
+    currentPlayingId.value = null;
+  }
+};
+
+// 在组件卸载时停止播放
+onUnmounted(() => {
+  if (audioPlayer.value && !audioPlayer.value.paused) {
+    audioPlayer.value.pause();
+  }
+});
 </script>
 
 <style scoped>

@@ -248,7 +248,7 @@ const handleSaveClone = async () => {
     try {
     
       // 确保目录存在
-      await window.$mapi.file.mkdir('avatar');
+      await window.$mapi.file.mkdir('avatar', { isFullPath: true });
       
 
       
