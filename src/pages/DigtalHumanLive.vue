@@ -101,8 +101,8 @@ const handleRoomClick = (room: LiveBroadcastRecord) => {
   if (!room.id) return;
   router.push({
     path: '/live-room/edit',
-    query: { id: room.id }
-  });
+    query: { id: room.id ,autoSelect: 'true'}
+  })
 };
 </script>
 

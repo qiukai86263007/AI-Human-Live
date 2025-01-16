@@ -461,6 +461,17 @@ const loadProducts = async () => {
 
   try {
     productList.value = await LiveProductService.listByLiveId(id);
+    // 如果有 autoSelect 参数且有商品，自动选择第一个商品
+    if (route.query.autoSelect === 'true' && productList.value.length > 0) {
+      const firstProduct = productList.value[0];
+      await handleSelectProduct(firstProduct);
+      
+      // 设置默认选项卡（比如 '产品台词'）
+      currentTab.value = '主播选择';
+      if (currentProduct.value) {
+        currentProduct.value.currentTab = '主播选择';
+      }
+    }
   } catch (error) {
     Message.error('加载产品列表失败');
   }
