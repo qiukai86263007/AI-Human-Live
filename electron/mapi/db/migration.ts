@@ -442,6 +442,23 @@ const versions = [
                 hsKeyid VARCHAR(255),
                 hsAccessKey VARCHAR(255)
             )`);
+
+            // 创建 speech_attribute 表
+            await db.execute(`
+              CREATE TABLE IF NOT EXISTS speech_attribute (
+                id VARCHAR(255) PRIMARY KEY,
+                type VARCHAR(100),
+                content TEXT,
+                create_date TIMESTAMP,
+                creator VARCHAR(100),
+                updater VARCHAR(100),
+                update_date TIMESTAMP,
+                state VARCHAR(100),
+                live_id VARCHAR(255),
+                product_id VARCHAR(255),
+                code INTEGER
+              )
+            `);
         }
     }
 ]
