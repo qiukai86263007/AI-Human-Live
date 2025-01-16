@@ -281,6 +281,15 @@
         </a-tabs>
       </div>
     </a-modal>
+
+    <a-modal v-model:visible="showSelectVoiceDialog" title="选择主播声音" width="500" @ok="handleSelectVoice"
+      @cancel="showSelectVoiceDialog = false">
+      <div class="select-voice-form">
+        <a-select v-model="selectedVoiceId" style="width: 100%" @change="handleSelectVoice">
+          <a-option v-for="voice in availableVoices" :key="voice.id" :value="voice.id">{{ voice.name }}</a-option>
+        </a-select>
+      </div>
+    </a-modal>
   </div>
 </template>
 
@@ -360,6 +369,46 @@ const saving = ref(false);
 // 添加音频播放器引用
 const audioPlayer = ref<HTMLAudioElement | null>(null);
 const currentPlayingId = ref<string | null>(null);
+
+const showSelectVoiceDialog = ref(false);
+const availableVoices = ref<SoundCloneItem[]>([]);
+const selectedVoiceId = ref('');
+
+// 加载可用的主播声音
+const loadAvailableVoices = async () => {
+  try {
+    const list = await AudioCharacterService.list();
+    availableVoices.value = list.filter(item => item.state === 'normal');
+  } catch (error) {
+    console.error('加载主播声音列表失败:', error);
+    Message.error('加载主播声音列表失败');
+  }
+};
+
+// 处理选择主播声音
+const handleSelectVoice = async () => {
+  if (!selectedVoiceId.value) {
+    Message.warning('请选择一个主播声音');
+    return;
+  }
+
+  const selectedVoice = availableVoices.value.find(v => v.id === selectedVoiceId.value);
+  if (selectedVoice) {
+    voiceId.value = selectedVoice.voice_id || '';
+    name.value = selectedVoice.name || '';
+    gender.value = selectedVoice.gender_id === 1 ? 'male' : 'female';
+    language.value = selectedVoice.language_id?.toString() || '1';
+  }
+
+  showSelectVoiceDialog.value = false;
+  selectedVoiceId.value = '';
+};
+
+// 显示选择主播声音对话框
+const handleShowVoiceSelect = () => {
+  loadAvailableVoices();
+  showSelectVoiceDialog.value = true;
+};
 
 // 获取克隆音频的公共函数
 const getClonedAudio = async (appKey: string, accessKeySecret: string, voiceId: string, name:string): Promise<string> => {
