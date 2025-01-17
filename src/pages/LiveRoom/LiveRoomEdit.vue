@@ -19,6 +19,8 @@ import LiveParameterService from '../../service/LiveParameterService';
 import SelectVoiceDialog from '../../components/Voice/SelectVoiceDialog.vue';
 import SpeechAttributeService, { SpeechAttributeRecord } from '../../service/SpeechAttributeService';
 import AudioCharacterService, { AudioCharacterRecord } from '../../service/AudioCharacterService';
+import { PathManager } from '../../utils/pathManager';
+import { textToSpeech } from '../../utils/HsTtsUtils';
 
 const router = useRouter();
 const route = useRoute();
@@ -722,6 +724,79 @@ const remainingChars = computed(() => {
   return maxTextLength - manualText.value.length;
 });
 
+// 添加播放状态管理
+const playingScriptId = ref<string | null>(null);
+
+// 处理台词试听
+const handlePreviewScript = async (script: ProductScriptRecord, event: Event) => {
+  if (event) {
+    event.stopPropagation();
+  }
+
+  // 如果当前脚本正在播放,则停止播放
+  if (playingScriptId.value === script.id) {
+    playingScriptId.value = null;
+    return;
+  }
+
+  try {
+    let audioPlayer = new Audio();
+    
+      // 没有音频则调用TTS生成
+      if (!selectedVoice.value) {
+        Message.warning('请先选择主播声音');
+        return;
+      }
+      console.log('selectedVoice', selectedVoice.value.app_key);
+      Message.loading('正在生成语音...');
+      const buffer = await textToSpeech(
+        selectedVoice.value.app_key || '',
+        selectedVoice.value.access_key_secret || '',
+        script.text_content,
+        selectedVoice.value.voice_id || ''
+      );
+
+      // 保存音频文件
+      const fileName = `audio/${script.id}.mp3`;
+      const fullPath = await window.$mapi.file.fullPath(fileName);
+      await window.$mapi.file.mkdir('audio', { isFullPath: true });
+      await window.$mapi.file.writeBuffer(fullPath, buffer, { isFullPath: true });
+
+      // 更新数据库中的音频URL
+      const storagePath = PathManager.toStoragePath(fullPath);
+      await ProductScriptService.update(script.id!, {
+        audio_url: storagePath,
+        updater: 'current_user'
+      });
+      //添加查询参数，避免浏览器缓存
+      audioPlayer.src = `file://${fullPath}?t=${Date.now()}`;
+      Message.clear();
+
+    // 设置当前播放的脚本ID
+    playingScriptId.value = script.id;
+
+    // 播放结束时清理
+    audioPlayer.onended = () => {
+      playingScriptId.value = null;
+      audioPlayer = null;
+    };
+
+    // 播放错误时清理
+    audioPlayer.onerror = () => {
+      Message.error('音频播放失败');
+      playingScriptId.value = null;
+      audioPlayer = null;
+    };
+
+    await audioPlayer.play();
+
+  } catch (error) {
+    console.error('试听失败:', error);
+    Message.error('试听失败');
+    playingScriptId.value = null;
+  }
+};
+
 // 添加台词到列表
 const addScript = async () => {
   if (!currentProduct.value?.id) {
@@ -1409,11 +1484,13 @@ const handleStartClone = async () => {
                               <icon-edit />
                             </template>
                           </a-button>
-                          <a-button size="mini">
+                          <a-button size="mini" :status="playingScriptId === script.id ? 'success' : 'normal'"
+                            @click="(e) => handlePreviewScript(script, e)">
                             <template #icon>
-                              <icon-play />
+                              <icon-pause v-if="playingScriptId === script.id" />
+                              <icon-play v-else />
                             </template>
-                            试听
+                            {{ playingScriptId === script.id ? '停止' : '试听' }}
                           </a-button>
                         </div>
                       </div>
