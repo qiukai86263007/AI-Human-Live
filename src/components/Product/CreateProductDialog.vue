@@ -2,9 +2,12 @@
 import { ref } from 'vue';
 import ProductService from '../../service/ProductService';
 import { Message } from '@arco-design/web-vue';
+import { v4 as uuidv4 } from 'uuid';
+import { PathManager } from '../../utils/pathManager';
 
 const visible = ref(false);
 const fileList = ref([]);
+const imageFile = ref<File | null>(null);
 const form = ref({
   product_name: '',
   product_type_id: '',
@@ -12,24 +15,56 @@ const form = ref({
   product_describe: ''
 });
 
-const handleImageChange = (files) => {
+const handleImageChange = async (files) => {
   if (files.length > 0) {
-    // 这里可以处理图片，比如转base64或者上传到服务器
-    form.value.product_backroud = files[0].url || files[0].name;
+    const file = files[0].file;
+    if (!file) {
+      Message.error('获取文件失败');
+      return;
+    }
+    imageFile.value = file;
+    form.value.product_backroud = 'temp';
   } else {
+    imageFile.value = null;
     form.value.product_backroud = '';
   }
 };
 
 const handleSubmit = async () => {
   // 表单验证
+  console.log('Form values:', form.value);
+  
   if (!form.value.product_name || !form.value.product_type_id || 
-      !form.value.product_backroud || !form.value.product_describe) {
+      !imageFile.value || !form.value.product_describe) {
+    console.log('Missing required fields:', {
+      name: !form.value.product_name,
+      type: !form.value.product_type_id,
+      image: !imageFile.value,
+      desc: !form.value.product_describe
+    });
     Message.warning('请填写所有必填项');
     return;
   }
 
   try {
+    // 保存图片文件
+    const file = imageFile.value;
+    const fileName = `images/product/${uuidv4()}${file.name.substring(file.name.lastIndexOf('.'))}`;
+    const fullPath = await window.$mapi.file.fullPath(fileName);
+    
+    // 确保目录存在
+    await window.$mapi.file.mkdir('images/product', { isFullPath: true });
+    
+    // 读取文件内容
+    const buffer = await file.arrayBuffer();
+    
+    // 写入文件
+    await window.$mapi.file.writeBuffer(fullPath, Buffer.from(buffer), { isFullPath: true });
+    
+    // 更新表单中的图片路径
+    form.value.product_backroud = PathManager.toStoragePath(fullPath);
+
+    // 创建产品记录
     const result = await ProductService.create({
       ...form.value,
       state: 'active',
@@ -51,6 +86,7 @@ const handleSubmit = async () => {
     visible.value = false;
     emit('success', result.id);
   } catch (error) {
+    console.error('Create product error:', error);
     Message.error('创建失败');
   }
 };
@@ -58,6 +94,7 @@ const handleSubmit = async () => {
 const show = () => {
   visible.value = true;
   fileList.value = [];
+  imageFile.value = null;
   form.value = {
     product_name: '',
     product_type_id: '',
@@ -96,9 +133,16 @@ defineExpose({
           v-model="form.product_type_id"
           placeholder="请选择产品种类"
         >
-          <a-option value="type1">种类1</a-option>
-          <a-option value="type2">种类2</a-option>
-          <a-option value="type3">种类3</a-option>
+          <a-option value="type1">服饰内衣</a-option>
+          <a-option value="type2">食品美食</a-option>
+          <a-option value="type2">美妆护肤</a-option>
+          <a-option value="type3">母婴用品</a-option>
+          <a-option value="type4">数码家电</a-option>
+          <a-option value="type5">家居生活</a-option>
+          <a-option value="type6">运动户外</a-option>
+          <a-option value="type7">汽车用品</a-option>
+          <a-option value="type8">图书音像</a-option>
+          <a-option value="type9">其他</a-option>
         </a-select>
       </a-form-item>
 
@@ -107,9 +151,19 @@ defineExpose({
           v-model:file-list="fileList"
           action="/"
           :auto-upload="false"
+          :accept="'.jpg,.jpeg,.png,.gif'"
+          :limit="1"
+          list-type="picture-card"
           image-preview
           @change="handleImageChange"
-        />
+        >
+          <template #upload-button>
+            <div class="flex flex-col items-center">
+              <icon-plus />
+              <div class="mt-2">上传图片</div>
+            </div>
+          </template>
+        </a-upload>
       </a-form-item>
 
       <a-form-item field="product_describe" label="产品描述" required>
