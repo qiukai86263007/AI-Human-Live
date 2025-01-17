@@ -306,7 +306,7 @@ const handleStartLive = async () => {
           Message.success('场控已关闭');
         }
       });
-      
+
     }
     Message.loading(`正在${actionText}直播...`);
     await LiveBroadcastService.update(liveId, {
@@ -467,7 +467,7 @@ const loadProducts = async () => {
     if (route.query.autoSelect === 'true' && productList.value.length > 0) {
       const firstProduct = productList.value[0];
       await handleSelectProduct(firstProduct);
-      
+
       // 设置默认选项卡（比如 '产品台词'）
       currentTab.value = '主播选择';
       if (currentProduct.value) {
@@ -726,29 +726,28 @@ const remainingChars = computed(() => {
 
 // 添加播放状态管理
 const playingScriptId = ref<string | null>(null);
-
+const isTextPlaying = ref(false);
+const audioTextPlayer = ref<HTMLAudioElement | null>(null);
 // 处理台词试听
 const handlePreviewScript = async (script: ProductScriptRecord, event: Event) => {
   if (event) {
     event.stopPropagation();
   }
 
-  // 如果当前脚本正在播放,则停止播放
-  if (playingScriptId.value === script.id) {
-    playingScriptId.value = null;
-    return;
-  }
-
   try {
-    let audioPlayer = new Audio();
-    
-      // 没有音频则调用TTS生成
-      if (!selectedVoice.value) {
-        Message.warning('请先选择主播声音');
-        return;
+    console.log('script.id', script.id);
+    console.log('playingScriptId', playingScriptId.value);
+    // 如果正在播放，则停止
+      // 如果当前脚本正在播放,则停止播放
+      if (playingScriptId.value === script.id) {
+          if (audioTextPlayer.value) {
+            audioTextPlayer.value.pause();
+            audioTextPlayer.value.currentTime = 0;
+          }
+          playingScriptId.value = null;
+          return;
       }
-      console.log('selectedVoice', selectedVoice.value.app_key);
-      Message.loading('正在生成语音...');
+    Message.loading('正在生成语音...');
       const buffer = await textToSpeech(
         selectedVoice.value.app_key || '',
         selectedVoice.value.access_key_secret || '',
@@ -768,31 +767,38 @@ const handlePreviewScript = async (script: ProductScriptRecord, event: Event) =>
         audio_url: storagePath,
         updater: 'current_user'
       });
-      //添加查询参数，避免浏览器缓存
-      audioPlayer.src = `file://${fullPath}?t=${Date.now()}`;
-      Message.clear();
-
-    // 设置当前播放的脚本ID
+    // 创建音频播放器
+    audioTextPlayer.value = new Audio(storagePath+'?t='+Date.now());
     playingScriptId.value = script.id;
-
-    // 播放结束时清理
-    audioPlayer.onended = () => {
-      playingScriptId.value = null;
-      audioPlayer = null;
+    // 监听播放结束事件
+    audioTextPlayer.value.onended = () => {
+        playingScriptId.value = null;
+      // 重置音频播放位置
+      if (audioTextPlayer.value) {
+        audioTextPlayer.value.currentTime = 0;
+          playingScriptId.value = null;
+      }
+      audioTextPlayer.value = null;
     };
 
-    // 播放错误时清理
-    audioPlayer.onerror = () => {
+    // 监听播放错误事件
+    audioTextPlayer.value.onerror = () => {
       Message.error('音频播放失败');
+      audioTextPlayer.value = null;
       playingScriptId.value = null;
-      audioPlayer = null;
     };
 
-    await audioPlayer.play();
+    // 开始播放
+    await audioTextPlayer.value.play();
 
   } catch (error) {
     console.error('试听失败:', error);
     Message.error('试听失败');
+    isTextPlaying.value = false;
+    if (audioTextPlayer.value) {
+      audioTextPlayer.value.currentTime = 0;
+    }
+    audioTextPlayer.value = null;
     playingScriptId.value = null;
   }
 };
@@ -1038,7 +1044,7 @@ watch(() => liveRoom.value?.id, async (newId) => {
 const loadRuleSettings = async () => {
   const liveId = route.query.id as string;
   if (!liveId) return;
-  
+
   try {
     // 加载产品问答配置
     const qaConfig = await QAndAConfigService.getByLiveId(liveId);
@@ -1057,7 +1063,7 @@ const loadRuleSettings = async () => {
 watch(() => rulesDemo.value.productQA, async (newValue) => {
   const liveId = route.query.id as string;
   if (!liveId) return;
-  
+
   try {
     const config = await QAndAConfigService.getByLiveId(liveId);
     if (config?.id) {
@@ -1071,7 +1077,7 @@ watch(() => rulesDemo.value.productQA, async (newValue) => {
 watch(() => rulesDemo.value.giftThanks, async (newValue) => {
   const liveId = route.query.id as string;
   if (!liveId) return;
-  
+
   try {
     const config = await GiftThankConfigService.getByLiveId(liveId);
     if (config?.id) {
@@ -1085,7 +1091,7 @@ watch(() => rulesDemo.value.giftThanks, async (newValue) => {
 watch(() => rulesDemo.value.welcomeGuide, async (newValue) => {
   const liveId = route.query.id as string;
   if (!liveId) return;
-  
+
   try {
     const config = await RegularInteractionConfigService.getByLiveId(liveId);
     if (config?.id) {
@@ -1100,18 +1106,18 @@ watch(() => rulesDemo.value.welcomeGuide, async (newValue) => {
 watch([selectedPlatformDemo, roomIdDemo, anchorNameDemo], async () => {
   const liveId = route.query.id as string;
   if (!liveId) return;
-  
+
   try {
     // 获取现有配置
     let config = await LiveParameterService.getByLiveId(liveId);
-    
+
     const updateData = {
       platform: selectedPlatformDemo.value,
       live_room_id: roomIdDemo.value,
       anchor_name: anchorNameDemo.value,
       updater: 'current_user'
     };
-    
+
     if (config) {
       // 更新现有配置
       await LiveParameterService.update(config.id!, updateData);
@@ -1133,7 +1139,7 @@ watch([selectedPlatformDemo, roomIdDemo, anchorNameDemo], async () => {
 const loadLiveParameter = async () => {
   const liveId = route.query.id as string;
   if (!liveId) return;
-  
+
   try {
     const config = await LiveParameterService.getByLiveId(liveId);
     if (config) {
@@ -1171,7 +1177,7 @@ const handlePreviewVoice = async () => {
 
     // 创建音频播放器
     audioPlayer.value = new Audio(selectedVoice.value.audio_url);
-    
+
     // 监听播放结束事件
     audioPlayer.value.onended = () => {
       isPlaying.value = false;
@@ -1229,22 +1235,26 @@ onUnmounted(() => {
     audioPlayer.value.pause();
     audioPlayer.value = null;
   }
+  if (audioTextPlayer.value) {
+    audioTextPlayer.value.pause();
+    audioTextPlayer.value = null;
+  }
 });
 
 // 加载当前主播声音配置
 const loadCurrentVoice = async () => {
   if (!currentProduct.value?.id || !route.query.id) return;
-  
+
   try {
     // 从speech_attribute表获取voice配置
-    const sql = `SELECT * FROM speech_attribute 
-                 WHERE live_id = ? 
-                 AND product_id = ? 
-                 AND type = 'voice' 
+    const sql = `SELECT * FROM speech_attribute
+                 WHERE live_id = ?
+                 AND product_id = ?
+                 AND type = 'voice'
                  AND state = 'normal'
-                 ORDER BY create_date DESC 
+                 ORDER BY create_date DESC
                  LIMIT 1`;
-                 
+
     const voiceConfig = await window.$mapi.db.first(sql, [
       route.query.id,
       currentProduct.value.id
@@ -1365,12 +1375,37 @@ const handleStartClone = async () => {
             </div>
           </template>
           <template v-else>
-            <div v-for="product in productList" :key="product.id"
-              class="px-4 py-2 cursor-pointer text-[14px] hover:bg-[#E5E6EB]" :class="{
+            <div v-for="(product, index) in productList" :key="product.id"
+              class="px-4 py-3 cursor-pointer hover:bg-[#E5E6EB]" :class="{
                 'bg-[#E5E6EB]': !isMultiSelect && currentProduct?.id === product.id,
                 'bg-blue-50': isMultiSelect && selectedProducts.includes(product.id!)
               }" @click="handleSelectProduct(product)">
-              {{ product.product_name }}
+              <div class="flex items-center gap-3">
+                <!-- 序号 -->
+                <div
+                  class="w-6 h-6 flex-shrink-0 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-sm">
+                  {{ index + 1 }}
+                </div>
+
+                <!-- 产品图片 -->
+                <div class="w-12 h-12 flex-shrink-0">
+                  <img v-if="product.product_backroud" :src="product.product_backroud"
+                    class="w-full h-full object-cover rounded" :alt="product.product_name" />
+                  <div v-else class="w-full h-full bg-gray-200 rounded flex items-center justify-center">
+                    <icon-image class="text-gray-400" />
+                  </div>
+                </div>
+
+                <!-- 产品名称 -->
+                <div class="flex-1 min-w-0">
+                  <div class="truncate text-sm" :title="product.product_name">
+                    {{ product.product_name }}
+                  </div>
+                  <div class="text-xs text-gray-500 truncate">
+                    {{ product.product_describe || '暂无描述' }}
+                  </div>
+                </div>
+              </div>
             </div>
           </template>
         </div>
@@ -1477,26 +1512,28 @@ const handleStartClone = async () => {
                           ? script.text_content.slice(0, 20) + '...'
                           : script.text_content }}
                         </div>
-                        <div class="flex items-center gap-2 ml-2 flex-shrink-0">
+
+                      </div>
+                      <div class="flex items-center justify-between mt-auto pt-2 border-t border-gray-100">
+
+                        <div class="flex items-center gap-2">
                           <a-tag>{{ script.script_type_id === 'manual' ? '文本' : 'AI' }}</a-tag>
                           <a-button size="mini" @click="(e) => handleEditScript(script, e)">
                             <template #icon>
                               <icon-edit />
                             </template>
                           </a-button>
-                          <a-button size="mini" :status="playingScriptId === script.id ? 'success' : 'normal'"
+                          <a-button type="outline" status="success" size="mini"
                             @click="(e) => handlePreviewScript(script, e)">
                             <template #icon>
-                              <icon-pause v-if="playingScriptId === script.id" />
-                              <icon-play v-else />
+                              <icon-pause-circle v-if="playingScriptId === script.id" />
+                              <icon-play-circle v-else />
                             </template>
                             {{ playingScriptId === script.id ? '停止' : '试听' }}
                           </a-button>
                         </div>
                       </div>
-                      <div class="text-gray-400 mt-auto">
-                        AI解析: {{ script.script_type_id === 'ai' ? 1 : 0 }}
-                      </div>
+
                     </div>
                   </template>
                   <template v-else>
