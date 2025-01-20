@@ -559,7 +559,7 @@ const handleSelectProduct = async (product: ProductRecord) => {
   await loadProductScene(product.id!);
 
   // 加载产品关联的脚本列表
-  await loadProductScripts(currentProduct.value.product_id!);
+  await loadProductScripts(product.product_id!);
 };
 // 添加声音选择相关的状态
 const showVoiceDialog = ref(false);
@@ -651,7 +651,7 @@ const saveCurrentSettings = async () => {
         scene_name: selectedAnchor.value.anchor_name,
         anchor_url: selectedAnchor.value.anchor_backgroud,
         anchor_id: selectedAnchor.value.id,
-        product_id: currentProduct.value.id,
+        product_id: currentProduct.value.product_id!,
         ording: 1,
         gender: 'unknown',
         anchor_video_url: '',
@@ -660,7 +660,7 @@ const saveCurrentSettings = async () => {
       });
     }
     Message.success('保存成功');
-    await loadProductScene(currentProduct.value.id);
+    await loadProductScene(currentProduct.value.product_id!);
   } catch (error) {
     Message.error('保存失败');
   }
@@ -860,7 +860,7 @@ const addScript = async () => {
       updater: 'system'
     });
 
-    await loadProductScripts(currentProduct.value.id);
+    await loadProductScripts(currentProduct.value.product_id!);
     manualText.value = '';
     Message.success('添加成功');
   } catch (error) {
@@ -910,7 +910,7 @@ const handleDeleteScript = async () => {
   try {
     await ProductScriptService.delete(selectedScriptId.value);
     if (currentProduct.value) {
-      await loadProductScripts(currentProduct.value.id!);
+      await loadProductScripts(currentProduct.value.product_id!);
     }
     selectedScriptId.value = ''; // 清空选中
     Message.success('删除成功');

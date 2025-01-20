@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { Message, Modal } from '@arco-design/web-vue';
 import CreateLiveRoomDialog from '../components/Live/CreateLiveRoomDialog.vue';
 import LiveBroadcastService, { LiveBroadcastRecord } from '../service/LiveBroadcastService';
+import LiveProductService from '../service/LiveProductService';
+import ProductSceneService from '../service/ProductSceneService';
 import { useRouter } from 'vue-router';
 
 const router = useRouter();
 const createDialog = ref();
 const liveRooms = ref<LiveBroadcastRecord[]>([]);
+const previewImages = ref<Record<string, string>>({});
 const searchText = ref('');
 const selectedType = ref('全部');
 const dateRange = ref([]);
@@ -22,6 +26,27 @@ const typeOptions = [
 const loadLiveRooms = async () => {
   try {
     liveRooms.value = await LiveBroadcastService.list();
+    // 加载每个直播间的预览图
+    for (const room of liveRooms.value) {
+      if (!room.id) continue;
+      try {
+        // 获取直播间的第一个产品
+        const products = await LiveProductService.listByLiveId(room.id);
+        console.log('products', products);
+        if (products.length > 0) {
+          // 获取第一个产品的场景（包含主播信息）
+          const scenes = await ProductSceneService.listByProductId(products[0].product_id);
+          console.log('scenes', scenes);
+          if (scenes.length > 0) {
+            // 使用第一个场景的主播图片作为预览图
+            previewImages.value[room.id] = scenes[0].anchor_url;
+            
+          }
+        }
+      } catch (error) {
+        console.error('加载预览图失败:', error);
+      }
+    }
   } catch (error) {
     console.error('加载直播间列表失败:', error);
   }
@@ -43,9 +68,9 @@ const filteredRooms = computed(() => {
     // 日期范围过滤
     let matchDate = true;
     if (dateRange.value && dateRange.value.length === 2) {
-      const roomDate = new Date(room.create_date).getTime();
-      const start = new Date(dateRange.value[0]);
-      const end = new Date(dateRange.value[1]);
+      const roomDate = room.create_date ? new Date(room.create_date).getTime() : 0;
+      const start = dateRange.value[0] ? new Date(dateRange.value[0]) : new Date();
+      const end = dateRange.value[1] ? new Date(dateRange.value[1]) : new Date();
       start.setHours(0, 0, 0, 0);
       end.setHours(23, 59, 59, 999);
       matchDate = roomDate >= start.getTime() && roomDate <= end.getTime();
@@ -104,6 +129,29 @@ const handleRoomClick = (room: LiveBroadcastRecord) => {
     query: { id: room.id ,autoSelect: 'true'}
   })
 };
+
+// 添加删除方法
+const handleDelete = async (room: LiveBroadcastRecord, event: Event) => {
+  // 阻止事件冒泡，避免触发卡片点击
+  event.stopPropagation();
+  
+  Modal.warning({
+    title: '确认删除',
+    content: `确定要删除直播间 "${room.live_name}" 吗？`,
+    okText: '确认',
+    cancelText: '取消',
+    async onOk() {
+      try {
+        await LiveBroadcastService.delete(room);
+        Message.success('删除成功');
+        loadLiveRooms(); // 重新加载列表
+      } catch (error) {
+        console.error('删除直播间失败:', error);
+        Message.error('删除失败');
+      }
+    },
+  });
+};
 </script>
 
 <template>
@@ -155,32 +203,63 @@ const handleRoomClick = (room: LiveBroadcastRecord) => {
     </div>
 
     <!-- 直播间列表 -->
-    <div class="grid grid-cols-5 gap-6">
+    <div class="grid grid-cols-4 gap-6">
       <template v-if="filteredRooms.length">
         <div v-for="room in filteredRooms" 
              :key="room.id" 
-             class="bg-[#1D1E2B] rounded-lg overflow-hidden cursor-pointer hover:bg-[#2A2B3B] transition-colors"
+             class="relative aspect-[3/4] rounded-lg overflow-hidden cursor-pointer group"
              @click="handleRoomClick(room)"
         >
-          <div class="aspect-video bg-black/20">
-            <!-- 预览图位置 -->
+          <!-- 删除按钮 -->
+          <div class="absolute top-3 right-3 z-10">
+            <a-button
+              type="primary"
+              status="danger"
+              shape="circle"
+              size="mini"
+              class="opacity-0 group-hover:opacity-100 transition-opacity"
+              @click="(e) => handleDelete(room, e)"
+            >
+              <template #icon>
+                <icon-delete />
+              </template>
+            </a-button>
           </div>
-          <div class="p-4">
-            <div class="text-white font-medium mb-2">{{ room.live_name }}</div>
-            <div class="text-gray-400 text-sm line-clamp-2">{{ room.live_introduction }}</div>
-            <div class="mt-2 flex justify-between items-center">
-              <a-tag :color="getStateColor(room.state)">
-                {{ getStateText(room.state) }}
-              </a-tag>
-              <span class="text-sm text-gray-500">
-                {{ new Date(room.create_date).toLocaleDateString() }}
-              </span>
+          
+          <!-- 预览图片 -->
+          <div class="absolute inset-0">
+            <template v-if="room.id && previewImages[room.id]">
+              <img :src="previewImages[room.id]" :alt="room.live_name" class="w-full h-full object-cover">
+            </template>
+            <template v-else>
+              <div class="w-full h-full flex items-center justify-center text-gray-500 bg-black/10">
+                <icon-image class="text-4xl" />
+              </div>
+            </template>
+          </div>
+          
+          <!-- 内容遮罩 -->
+          <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent">
+            <div class="absolute bottom-0 left-0 right-0 p-6">
+              <div class="text-white font-medium text-lg mb-3">{{ room.live_name }}</div>
+              <div class="text-gray-100 text-sm line-clamp-2 mb-4">{{ room.live_introduction }}</div>
+              <div class="flex justify-between items-center">
+                <a-tag :color="getStateColor(room.state)" size="small">
+                  {{ getStateText(room.state) }}
+                </a-tag>
+                <span class="text-sm text-gray-200">
+                  {{ room.create_date ? new Date(room.create_date).toLocaleDateString() : '' }}
+                </span>
+              </div>
             </div>
           </div>
+          
+          <!-- 悬停效果遮罩 -->
+          <div class="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
         </div>
       </template>
       <template v-else>
-        <div class="col-span-5 text-center py-12 text-gray-400">
+        <div class="col-span-3 text-center py-12 text-gray-400">
           {{ searchText || selectedType !== '全部' || dateRange.length ? 
              '没有找到符合条件的直播间' : 
              '暂无直播间，点击右上角创建' }}
