@@ -70,6 +70,11 @@ export const SpeechAttributeService = {
         
         return id;
     },
+    async getByLiveAndProduct(liveId: string, productId: string): Promise<SpeechAttributeRecord | null> {
+        const records = await this.list();
+        return records.find(r => r.live_id === liveId && r.product_id === productId) || null;
+    
+    },
 
     async update(id: string, record: Partial<SpeechAttributeRecord>): Promise<void> {
         const updates: string[] = [];

@@ -210,8 +210,24 @@ const editCategory = (category: QuestionCategory) => {
 };
 
 // 删除问题种类
-const deleteCategory = (categoryId: number) => {
-  questionCategories.value = questionCategories.value.filter(c => c.id !== categoryId);
+const deleteCategory = async (categoryId: string) => {
+  if (!currentProduct.value) {
+    Message.warning('请先选择产品');
+    return;
+  }
+
+  try {
+    // 从数据库中删除
+    await QAndAService.delete(categoryId);
+    
+    // 从界面数据中移除
+    currentProduct.value.questionCategories = currentProduct.value.questionCategories.filter(c => c.id !== categoryId);
+    
+    Message.success('删除成功');
+  } catch (error) {
+    console.error('删除问题种类失败:', error);
+    Message.error('删除失败');
+  }
 };
 
 // 编辑Q&A
@@ -522,7 +538,7 @@ const handleSelectProduct = async (product: ProductRecord) => {
     }
     return;
   }
-
+  console.log('product: ', product);
   // 重置主播选择
   selectedAnchor.value = null;
   currentProductScene.value = null;
@@ -530,13 +546,12 @@ const handleSelectProduct = async (product: ProductRecord) => {
   currentProduct.value = {
     ...product,
     live_id: route.query.id as string,
-    product_id: product.id!,
     ording: 0,
     scripts: [],
     questionCategories: [],
     currentTab: currentTab.value
   } as ProductExtend;
-
+  console.log('c: ', currentProduct.value );
   currentTab.value = '主播选择';
   selectedProducts.value = [product.id!];
 
@@ -544,7 +559,7 @@ const handleSelectProduct = async (product: ProductRecord) => {
   await loadProductScene(product.id!);
 
   // 加载产品关联的脚本列表
-  await loadProductScripts(product.id!);
+  await loadProductScripts(currentProduct.value.product_id!);
 };
 // 添加声音选择相关的状态
 const showVoiceDialog = ref(false);
@@ -559,25 +574,40 @@ const handleChangeVoice = () => {
 const handleVoiceSelect = async (voice: any) => {
   selectedVoice.value = voice;
   try {
-    // 更新语音属性配置
-    if (currentProduct.value?.id) {
+    if (!currentProduct.value?.id) return;
+    if (!currentProduct.value?.product_id) return;
+    // 先查询是否存在配置
+    const existingConfig = await SpeechAttributeService.getByLiveAndProduct(
+      route.query.id as string,
+      currentProduct.value.product_id
+    );
+
+    const voiceData = {
+      type: 'voice',
+      content: JSON.stringify({
+        voicer_id: voice.id,
+        voicer_name: voice.name
+      }),
+      state: 'normal',
+      live_id: route.query.id as string,
+      product_id: currentProduct.value.product_id,
+      code: voice.code || 0,
+      updater: 'current_user'
+    };
+
+    if (existingConfig) {
+      // 更新现有配置
+      await SpeechAttributeService.update(existingConfig.id!, voiceData);
+    } else {
+      // 创建新配置
       await SpeechAttributeService.create({
-        type: 'voice',
-        content: JSON.stringify({
-          voicer_id: voice.id,
-          voicer_name: voice.name
-        }),
-        state: 'normal',
-        live_id: route.query.id as string,
-        product_id: currentProduct.value.id,
-        code: voice.code || 0,
-        creator: 'current_user',
-        updater: 'current_user'
+        ...voiceData,
+        creator: 'current_user'
       });
-      Message.success('更新声音成功');
     }
+    Message.success('更新声音成功');
   } catch (error) {
-    console.error('更新声音失败:', error);
+    await window.$mapi.log.error("更新声音失败: ", error);
     Message.error('更新声音失败');
   }
 };
@@ -595,7 +625,7 @@ const loadProductScene = async (productId: string) => {
       }
     }
   } catch (error) {
-    console.error('加载产品场景失败:', error);
+    await window.$mapi.log.info("加载产品场景失败: ", error);
   }
 };
 
@@ -756,7 +786,7 @@ const handlePreviewScript = async (script: ProductScriptRecord, event: Event) =>
       );
 
       // 保存音频文件
-      const fileName = `audio/${script.id}.mp3`;
+      const fileName = `audio/${script.id}.wav`;
       const fullPath = await window.$mapi.file.fullPath(fileName);
       await window.$mapi.file.mkdir('audio', { isFullPath: true });
       await window.$mapi.file.writeBuffer(fullPath, buffer, { isFullPath: true });
@@ -818,7 +848,7 @@ const addScript = async () => {
   try {
     await ProductScriptService.create({
       script_type_id: 'manual',
-      product_id: currentProduct.value.id,
+      product_id: currentProduct.value.product_id,
       text_content: manualText.value,
       audio_content: '',
       gender: 0,
@@ -938,7 +968,7 @@ const handleSaveScript = async () => {
       updater: 'current_user'
     });
     if (currentProduct.value) {
-      await loadProductScripts(currentProduct.value.id!);
+      await loadProductScripts(currentProduct.value.product_id!);
     }
     handleCancelEdit();
     Message.success('保存成功');
@@ -1257,7 +1287,7 @@ const loadCurrentVoice = async () => {
 
     const voiceConfig = await window.$mapi.db.first(sql, [
       route.query.id,
-      currentProduct.value.id
+      currentProduct.value.product_id
     ]);
 
     if (voiceConfig) {
@@ -1292,19 +1322,98 @@ const handleStartClone = async () => {
   }
 
   try {
-    Message.loading('正在上传素材并克隆中...');
+    Message.loading('正在生成台词音频...');
+    await window.$mapi.log.info("正在生成台词音频...");
 
-    // 调用克隆接口
+    // 获取所有产品
+    const products = await LiveProductService.listByLiveId(liveId);
+
+    // 获取语音配置
+    for (const product of products) {
+      // 获取产品的语音配置
+      const voiceConfig = await window.$mapi.db.first(
+        `SELECT * FROM speech_attribute
+         WHERE live_id = ?
+         AND product_id = ?
+         AND type = 'voice'
+         AND state = 'normal'
+         ORDER BY create_date DESC
+         LIMIT 1`,
+        [liveId, product.product_id]
+      );
+      await window.$mapi.log.info("product.product_id: ", product.product_id);
+      await window.$mapi.log.info("liveId: ", liveId);
+      const productDetail = await ProductService.get(product.product_id);
+      const productName = productDetail?.product_name;
+
+      if (!voiceConfig) {
+        Message.warning(`产品 ${productName} 未配置语音，请先配置语音`);
+        throw new Error(`产品 ${productName} 未配置语音，请先配置语音`);
+      }
+
+      // 解析语音配置
+      const voiceInfo = JSON.parse(voiceConfig.content);
+
+      // 获取语音角色信息
+      const voiceCharacter = await AudioCharacterService.get(voiceInfo.voicer_id);
+      if (!voiceCharacter) {
+        Message.warning(`产品 ${productName} 的语音配置无效`);
+        throw new Error(`产品 ${productName} 的语音配置无效`);
+      }
+
+      // 获取产品的所有脚本
+      const scripts = await ProductScriptService.listByProductId(product.product_id);
+      console.log('scripts: '+scripts);
+      // 渲染每个脚本
+      for (const script of scripts) {
+        try {
+          // 调用TTS接口渲染音频
+          const buffer = await textToSpeech(
+            voiceCharacter.app_key || '',
+            voiceCharacter.access_key_secret || '',
+            script.text_content,
+            voiceCharacter.voice_id || ''
+          );
+
+          // 保存音频文件
+          const fileName = `audio/${product.product_id}/${script.id}.wav`;
+          const fullPath = await window.$mapi.file.fullPath(fileName);
+
+          // 确保目录存在
+          await window.$mapi.file.mkdir(`audio/${product.product_id}`, { isFullPath: true });
+
+          // 写入音频文件
+          await window.$mapi.file.writeBuffer(fullPath, buffer, { isFullPath: true });
+
+          // 更新脚本的音频URL
+          await ProductScriptService.update(script.id!, {
+            audio_url: PathManager.toStoragePath(fullPath),
+            updater: 'current_user'
+          });
+
+        } catch (error) {
+          await window.$mapi.log.error(`产品 ${productName} 的脚本 ${script.id} 渲染失败`);
+          throw new Error(`产品 ${productName} 的脚本 ${script.id} 渲染失败`);
+        }
+      }
+    }
+
+    Message.success('脚本渲染完成，开始上传克隆服务器进行克隆...');
+    await window.$mapi.log.info('脚本渲染完成，开始上传克隆服务器进行克隆...');
+    // 调用克隆接口 :TODO
+       
+    // 更新直播间状态
     await LiveBroadcastService.update(liveId, {
       state: 'created',
       update_date: new Date().toISOString(),
       updater: 'current_user'
     });
+
     Message.success('克隆成功');
     // 通知父组件刷新列表
     emit('refresh');
   } catch (error) {
-    console.error('克隆失败:', error);
+    await window.$mapi.log.error('克隆失败：'+error);
     Message.error('克隆失败');
   }
 };
