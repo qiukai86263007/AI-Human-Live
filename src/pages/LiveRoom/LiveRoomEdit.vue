@@ -1769,10 +1769,7 @@ const handleStartClone = async () => {
                   <a-input-search v-model="questionSearchText" placeholder="搜索内容" allow-clear
                     @search="handleQuestionSearch" @clear="handleQuestionSearch('')" />
                   <a-button type="primary" size="small" @click="addNewCategory">
-                    新增问题
-                  </a-button>
-                  <a-button type="primary" size="small">
-                    选择问题
+                    新增问题种类
                   </a-button>
                 </div>
 
@@ -1923,10 +1920,7 @@ const handleStartClone = async () => {
               <div class="mb-4">
                 <div class="flex items-center gap-4 mb-2">
                   <span class="w-20">直播平台</span>
-                  <a-select class="flex-1" v-model="selectedPlatformDemo" :disabled="!canEditAISettings">
-                    <!-- <template #prefix>
-                      <img src="`/platform-icons/${selectedPlatform}.png`" class="w-5 h-5 rounded-full" />
-                    </template> -->
+                  <a-select class="flex-1" v-model="selectedPlatformDemo" :disabled="!canEditAISettings" placeholder="请选择直播平台">
                     <a-option value="快手">快手</a-option>
                     <a-option value="抖音">抖音</a-option>
                     <a-option value="视频号">视频号</a-option>
@@ -1938,17 +1932,17 @@ const handleStartClone = async () => {
               </div>
 
               <!-- 房间信息 -->
-              <div class="grid grid-cols-2 gap-4 mb-6">
-                <div class="flex items-center gap-4">
+              <div class="mb-6 pr-4">
+                <div class="flex items-center gap-4 mb-4">
                   <span class="w-20">房间号ID</span>
-                  <a-input class="flex-1" v-model="roomIdDemo" :disabled="!canEditAISettings" />
+                  <a-input class="flex-1" v-model="roomIdDemo" :disabled="!canEditAISettings" placeholder="请输入直播间ID" />
                 </div>
                 <div class="flex items-center gap-4">
                   <span class="w-20">主播名称</span>
-                  <a-input class="flex-1" v-model="anchorNameDemo" :disabled="!canEditAISettings" />
+                  <a-input class="flex-1" v-model="anchorNameDemo" :disabled="!canEditAISettings" placeholder="请输入主播名称" />
                 </div>
               </div>
-
+              
               <!-- 规则设置 -->
               <div class="mb-6">
                 <div class="text-base mb-4">规则设置</div>
