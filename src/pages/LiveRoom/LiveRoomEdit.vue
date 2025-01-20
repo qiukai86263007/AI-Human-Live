@@ -275,7 +275,7 @@ const deleteQA = async (categoryId: string, qaId: string) => {
       updater: 'current_user'
     });
 
-    await loadProductQAs(currentProduct.value.id);
+    await loadProductQAs(currentProduct.value.product_id!);
     Message.success('删除成功');
   } catch (error) {
     console.error('删除问答失败:', error);
@@ -356,10 +356,8 @@ const saveQA = async () => {
 
     const category = await QAndAService.get(categoryId);
     if (!category) return;
-    console.log('editingQA.value.id', editingQA.value.id);
     // 如果是编辑现有问答
     if (editingQA.value.id) {
-
       const index = parseInt(editingQA.value.id.split('-').pop() || '');
       if (!isNaN(index)) {
         const like_problems = Array.isArray(category.like_problems)
@@ -398,7 +396,7 @@ const saveQA = async () => {
       });
     }
 
-    await loadProductQAs(currentProduct.value.id);
+    await loadProductQAs(currentProduct.value.product_id!);
 
     showEditQADialog.value = false;
     editingQA.value = { id: 0, question: '', answer: '' };
@@ -420,21 +418,30 @@ const saveCategory = async () => {
   }
 
   try {
-    // 创建新的问题种类
-    await QAndAService.createCategory(
-      currentProduct.value.id!,
-      editingCategory.value.name
-    );
+    if (editingCategory.value.id) {
+      // 更新现有问题种类
+      await QAndAService.update(editingCategory.value.id, {
+        problem: editingCategory.value.name,
+        updater: 'current_user'
+      });
+      Message.success('更新成功');
+    } else {
+      // 创建新的问题种类
+      await QAndAService.createCategory(
+        currentProduct.value.product_id!,
+        editingCategory.value.name
+      );
+      Message.success('创建成功');
+    }
 
     // 重新加载问答列表
-    await loadProductQAs(currentProduct.value.id!);
+    await loadProductQAs(currentProduct.value.product_id!);
 
     showEditCategoryDialog.value = false;
     editingCategory.value = { id: 0, name: '', qas: [] };
-    Message.success('创建成功');
   } catch (error) {
-    console.error('创建问题种类失败:', error);
-    Message.error('创建失败');
+    console.error('保存问题种类失败:', error);
+    Message.error('保存失败');
   }
 };
 
@@ -538,10 +545,8 @@ const handleSelectProduct = async (product: ProductRecord) => {
     }
     return;
   }
-  console.log('product: ', product);
-  // 重置主播选择
-  selectedAnchor.value = null;
-  currentProductScene.value = null;
+
+
 
   currentProduct.value = {
     ...product,
@@ -551,15 +556,17 @@ const handleSelectProduct = async (product: ProductRecord) => {
     questionCategories: [],
     currentTab: currentTab.value
   } as ProductExtend;
-  console.log('c: ', currentProduct.value );
   currentTab.value = '主播选择';
   selectedProducts.value = [product.id!];
 
   // 加载该产品关联的主播场景
-  await loadProductScene(product.id!);
+  await loadProductScene(product.product_id!);
 
   // 加载产品关联的脚本列表
   await loadProductScripts(product.product_id!);
+
+  // 加载产品的问答列表
+  await loadProductQAs(product.product_id!);
 };
 // 添加声音选择相关的状态
 const showVoiceDialog = ref(false);
@@ -615,7 +622,9 @@ const handleVoiceSelect = async (voice: any) => {
 const loadProductScene = async (productId: string) => {
   if (!productId) return;
   try {
+    console.log('productId: ', productId);
     const scenes = await ProductSceneService.listByProductId(productId);
+    console.log('scenes: ', scenes);
     if (scenes.length > 0) {
       currentProductScene.value = scenes[0];
       // 如果存在场景，自动选中对应的主播
@@ -645,6 +654,7 @@ const saveCurrentSettings = async () => {
         scene_name: selectedAnchor.value.anchor_name,
         updater: 'system'
       });
+      console.log('currentProductScene.value: ', currentProductScene.value);
     } else {
       // 创建新场景
       await ProductSceneService.create({
@@ -658,6 +668,7 @@ const saveCurrentSettings = async () => {
         creator: 'system',
         updater: 'system'
       });
+      console.log('currentProductScene.value: ', currentProductScene.value);
     }
     Message.success('保存成功');
     await loadProductScene(currentProduct.value.product_id!);
@@ -690,7 +701,7 @@ const handleDelete = async () => {
 
   try {
     // 如果当前选中的产品被删除，清空currentProduct
-    if (currentProduct.value && selectedProducts.value.includes(currentProduct.value.id!)) {
+    if (currentProduct.value && selectedProducts.value.includes(currentProduct.value.product_id!)) {
       currentProduct.value = null;
     }
 
