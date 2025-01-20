@@ -622,19 +622,26 @@ const handleVoiceSelect = async (voice: any) => {
 const loadProductScene = async (productId: string) => {
   if (!productId) return;
   try {
-    console.log('productId: ', productId);
+    // 重置当前场景和选中的主播
+    currentProductScene.value = null;
+    selectedAnchor.value = null;
+
+    // 获取该产品的场景列表
     const scenes = await ProductSceneService.listByProductId(productId);
-    console.log('scenes: ', scenes);
     if (scenes.length > 0) {
+      // 设置当前场景
       currentProductScene.value = scenes[0];
-      // 如果存在场景，自动选中对应的主播
-      const anchor = await AnchorService.get(scenes[0].anchor_id);
-      if (anchor) {
-        selectedAnchor.value = anchor;
+      // 如果存在场景，加载对应的主播
+      if (scenes[0].anchor_id) {
+        const anchor = await AnchorService.get(scenes[0].anchor_id);
+        if (anchor) {
+          selectedAnchor.value = anchor;
+        }
       }
     }
   } catch (error) {
-    await window.$mapi.log.info("加载产品场景失败: ", error);
+    console.error('加载产品场景失败:', error);
+    Message.error('加载场景失败');
   }
 };
 
