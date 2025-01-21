@@ -62,6 +62,9 @@ const tabs = [
   { key: '商品讲解', icon: 'icon-shopping' }
 ];
 
+// 添加当前选中的主播选项卡状态
+const currentAnchorTab = ref<string>('1'); // 1: 主播广场, 2: 我的主播
+
 // 获取主播列表
 const loadAnchors = async () => {
   anchors.value = await AnchorService.list();
@@ -69,8 +72,18 @@ const loadAnchors = async () => {
 
 // 过滤后的主播列表
 const filteredAnchors = computed(() => {
-  if (!searchText.value) return anchors.value;
-  return anchors.value.filter(anchor =>
+  // 首先根据选项卡过滤
+  const tabFiltered = anchors.value.filter(anchor => {
+    if (currentAnchorTab.value === '1') {
+      return anchor.creator === 'system';
+    } else {
+      return anchor.creator === 'myself';
+    }
+  });
+  
+  // 然后根据搜索文本过滤
+  if (!searchText.value) return tabFiltered;
+  return tabFiltered.filter(anchor =>
     anchor.anchor_name.toLowerCase().includes(searchText.value.toLowerCase())
   );
 });
@@ -1436,6 +1449,20 @@ const handleStartClone = async () => {
   }
 };
 
+// 添加处理搜索的方法
+const handleSearch = (value: string) => {
+  searchText.value = value;
+};
+
+// 处理主播选项卡切换
+const handleAnchorTabChange = (key: string | number) => {
+  currentAnchorTab.value = String(key);
+  // 重置分页
+  currentPage.value = 1;
+  // 清空搜索
+  searchText.value = '';
+};
+
 </script>
 
 <template>
@@ -1892,7 +1919,7 @@ const handleStartClone = async () => {
       <div v-if="currentTab === '主播选择'" class="w-96 flex-shrink-0 border-l border-gray-800 pl-4 pt-4 min-h-full">
         <template v-if="!showStartLiveButton">
           <div class="mb-4">
-            <a-tabs>
+            <a-tabs :model-value="currentAnchorTab" @change="handleAnchorTabChange">
               <a-tab-pane key="1" title="主播广场" />
               <a-tab-pane key="2" title="我的主播" />
             </a-tabs>
@@ -1903,22 +1930,29 @@ const handleStartClone = async () => {
           </div>
 
           <!-- 主播列表 -->
-          <div class="grid grid-cols-2 min-h-[500px]">
-            <div v-for="anchor in currentAnchors" :key="anchor.id" class="flex flex-col cursor-pointer"
-              @click="handleAnchorSelect(anchor)">
-              <div class="aspect-[3/4] rounded-lg overflow-hidden relative">
-                <img :src="anchor.anchor_backgroud" :alt="anchor.anchor_name" class="w-full h-full object-cover" />
-                <div v-if="selectedAnchor?.id === anchor.id"
-                  class="absolute inset-0 ring-4 ring-blue-500 ring-opacity-75">
-                  <div class="absolute top-1 right-1 bg-blue-500 rounded-full p-1">
-                    <i class="text-white text-lg icon-check"></i>
+          <div class="grid grid-cols-2 gap-4 mt-4">
+            <template v-if="filteredAnchors.length">
+              <div v-for="anchor in currentAnchors" :key="anchor.id" class="flex flex-col cursor-pointer"
+                @click="handleAnchorSelect(anchor)">
+                <div class="aspect-[3/4] rounded-lg overflow-hidden relative">
+                  <img :src="anchor.anchor_backgroud" :alt="anchor.anchor_name" class="w-full h-full object-cover" />
+                  <div v-if="selectedAnchor?.id === anchor.id"
+                    class="absolute inset-0 ring-4 ring-blue-500 ring-opacity-75">
+                    <div class="absolute top-1 right-1 bg-blue-500 rounded-full p-1">
+                      <i class="text-white text-lg icon-check"></i>
+                    </div>
                   </div>
                 </div>
+                <div class="text-center mt-2">
+                  <div class="text-sm font-medium">{{ anchor.anchor_name }}</div>
+                </div>
               </div>
-              <div class="text-center">
-                <div class="text-sm">{{ anchor.anchor_name }}</div>
+            </template>
+            <template v-else>
+              <div class="col-span-2 flex items-center justify-center h-40 text-gray-400">
+                暂无主播数据
               </div>
-            </div>
+            </template>
           </div>
 
           <!-- 分页 -->
