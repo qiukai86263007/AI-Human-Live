@@ -188,15 +188,17 @@
                 <div class="mb-4 text-lg font-medium">引导内容设置</div>
                 <!-- 引导类型选项卡 -->
                 <a-tabs v-model:activeKey="currentGuideType" @change="handleTabChange">
-                  <a-tab-pane key="综合引导" title="综合引导" />
-                  <a-tab-pane key="关注引导" title="关注引导" />
-                  <a-tab-pane key="消费引导" title="消费引导" />
-                  <a-tab-pane key="分享引导" title="分享引导" />
+                  <a-tab-pane v-if="currentTab === 'timing'" key="综合引导" title="综合引导" />
+                  <a-tab-pane v-if="currentTab === 'timing'" key="关注引导" title="关注引导" />
+                  <a-tab-pane v-if="currentTab === 'timing'" key="消费引导" title="消费引导" />
+                  <a-tab-pane v-if="currentTab === 'timing'" key="分享引导" title="分享引导" />
+                  <a-tab-pane v-if="currentTab === 'gift'" key="小额礼物感谢" title="小额礼物感谢" />
+                  <a-tab-pane v-if="currentTab === 'gift'" key="大额礼物感谢" title="大额礼物感谢" />
                 </a-tabs>
                 
-                <!-- 添加条件按钮 -->
+                <!-- 添加引导按钮 -->
                 <div class="flex mb-4">
-                  <a-button type="primary" @click="addGiftGuide">
+                  <a-button type="primary" @click="addGuide">
                     <template #icon>
                       <icon-plus />
                     </template>
@@ -214,12 +216,12 @@
                         <div class="flex items-center justify-between">
                           <div>{{ guide.content }}</div>
                           <div class="flex items-center gap-2">
-                            <a-button type="text" size="mini" @click="editGiftGuide(guide)">
+                            <a-button type="text" size="mini" @click="editGuide(guide)">
                               <template #icon>
                                 <icon-edit />
                               </template>
                             </a-button>
-                            <a-button type="text" size="mini" status="danger" @click="deleteGiftGuide(guide.id)">
+                            <a-button type="text" size="mini" status="danger" @click="deleteGuide(guide.id)">
                               <template #icon>
                                 <icon-delete />
                               </template>
@@ -470,14 +472,18 @@
               <div class="flex-grow">
                 <div class="mb-4 text-lg font-medium">引导内容设置</div>
                 <!-- 引导类型选项卡 -->
-                <a-tabs v-model:activeKey="currentGuideType" @change="handleGiftTabChange">
-                  <a-tab-pane key="小额礼物感谢" title="小额礼物感谢" />
-                  <a-tab-pane key="大额礼物感谢" title="大额礼物感谢" />
+                <a-tabs v-model:activeKey="currentGuideType" @change="handleTabChange">
+                  <a-tab-pane v-if="currentTab === 'timing'" key="综合引导" title="综合引导" />
+                  <a-tab-pane v-if="currentTab === 'timing'" key="关注引导" title="关注引导" />
+                  <a-tab-pane v-if="currentTab === 'timing'" key="消费引导" title="消费引导" />
+                  <a-tab-pane v-if="currentTab === 'timing'" key="分享引导" title="分享引导" />
+                  <a-tab-pane v-if="currentTab === 'gift'" key="小额礼物感谢" title="小额礼物感谢" />
+                  <a-tab-pane v-if="currentTab === 'gift'" key="大额礼物感谢" title="大额礼物感谢" />
                 </a-tabs>
                 
-                <!-- 添加条件按钮 -->
+                <!-- 添加引导按钮 -->
                 <div class="flex mb-4">
-                  <a-button type="primary" @click="addGiftGuide">
+                  <a-button type="primary" @click="addGuide">
                     <template #icon>
                       <icon-plus />
                     </template>
@@ -495,12 +501,12 @@
                         <div class="flex items-center justify-between">
                           <div>{{ guide.content }}</div>
                           <div class="flex items-center gap-2">
-                            <a-button type="text" size="mini" @click="editGiftGuide(guide)">
+                            <a-button type="text" size="mini" @click="editGuide(guide)">
                               <template #icon>
                                 <icon-edit />
                               </template>
                             </a-button>
-                            <a-button type="text" size="mini" status="danger" @click="deleteGiftGuide(guide.id)">
+                            <a-button type="text" size="mini" status="danger" @click="deleteGuide(guide.id)">
                               <template #icon>
                                 <icon-delete />
                               </template>
@@ -620,8 +626,19 @@ const tabs = [
   { key: 'gift', name: '礼物感谢' },
 ];
 
-// 当前选中的选项卡
-const currentTab = ref('global');
+// 定义标签页类型
+type TabType = 'timing' | 'gift' | 'global' | 'popularity';
+type GuideType = '综合引导' | '关注引导' | '消费引导' | '分享引导' | '小额礼物感谢' | '大额礼物感谢';
+
+// 定义对话框显示状态
+const showEditGuideDialog = ref(false);
+
+// 当前编辑的引导内容
+const editingGuide = ref<{ id: number; content: string }>({ id: 0, content: '' });
+
+// 修改 ref 的类型定义
+const currentTab = ref<TabType>('timing');
+const currentGuideType = ref<GuideType>('综合引导');
 
 const props = defineProps<{
   visible: boolean;
@@ -862,28 +879,150 @@ watch(() => props.visible, (val) => {
   }
 });
 
-// 当前选中的引导类型
-const currentGuideType = ref('综合引导');
-
-// 引导内容列表
-const guideList = ref({
-  '综合引导': [],
-  '关注引导': [],
-  '消费引导': [],
-  '分享引导': []
-});
-
-// 引导类型映射
-const guideTypeMap = {
+// 定义引导类型映射
+const guideTypeMap: Record<GuideType, string> = {
   '综合引导': 'all',
   '关注引导': 'follow',
   '消费引导': 'cost',
-  '分享引导': 'share'
+  '分享引导': 'share',
+  '小额礼物感谢': 'small',
+  '大额礼物感谢': 'large'
 };
 
-// 加载引导内容
+// 修改引导内容列表的类型定义
+const guideList = ref<{
+  [key in GuideType]?: Array<{ id: number; content: string }>;
+}>({
+  '综合引导': [],
+  '关注引导': [],
+  '消费引导': [],
+  '分享引导': [],
+  '小额礼物感谢': [],
+  '大额礼物感谢': []
+});
+
+// 获取当前类型的引导列表
+const getGuideList = (type: GuideType) => {
+  const tab = currentTab.value;
+  if (tab === 'gift') {
+    const typeMap = {
+      '小额礼物感谢': 'small',
+      '大额礼物感谢': 'large'
+    } as const;
+    const key = typeMap[type as keyof typeof typeMap];
+    return key ? giftSettings.rules[key] : [];
+  } else {
+    return guideList.value[type] || [];
+  }
+};
+
+// 添加引导内容的统一方法
+const addGuide = () => {
+  editingGuide.value = { id: Date.now(), content: '' };
+  showEditGuideDialog.value = true;
+};
+
+// 编辑引导内容的统一方法
+const editGuide = (guide: { id: number; content: string }) => {
+  editingGuide.value = { ...guide };
+  showEditGuideDialog.value = true;
+};
+
+// 删除引导内容的统一方法
+const deleteGuide = (guideId: number) => {
+  const tab = currentTab.value;
+  if (tab === 'gift') {
+    const typeMap = {
+      '小额礼物感谢': 'small',
+      '大额礼物感谢': 'large'
+    } as const;
+    const type = typeMap[currentGuideType.value as keyof typeof typeMap];
+    if (!type) return;
+
+    const giftList = giftSettings.rules[type];
+    const index = giftList.findIndex(item => item.id === guideId);
+    if (index > -1) {
+      giftList.splice(index, 1);
+      giftSettings.rules[type] = [...giftList];
+    }
+  } else if (tab === 'timing') {
+    const timingList = guideList.value[currentGuideType.value];
+    if (!Array.isArray(timingList)) return;
+    
+    const index = timingList.findIndex(item => item.id === guideId);
+    if (index > -1) {
+      timingList.splice(index, 1);
+      guideList.value[currentGuideType.value] = [...timingList];
+
+      const key = guideTypeMap[currentGuideType.value];
+      if (key) {
+        timingSettings.value.contents[key] = JSON.stringify(guideList.value[currentGuideType.value]);
+      }
+    }
+  }
+};
+
+// 编辑确认方法
+const handleEditGuideConfirm = () => {
+  if (!editingGuide.value.content.trim()) {
+    Message.warning('引导内容不能为空');
+    return;
+  }
+
+  const tab = currentTab.value;
+  if (tab === 'gift') {
+    const typeMap = {
+      '小额礼物感谢': 'small',
+      '大额礼物感谢': 'large'
+    } as const;
+    const type = typeMap[currentGuideType.value as keyof typeof typeMap];
+    if (!type) return;
+
+    const giftList = giftSettings.rules[type];
+    const index = giftList.findIndex(item => item.id === editingGuide.value.id);
+    
+    if (index > -1) {
+      giftList[index] = { ...editingGuide.value };
+    } else {
+      giftList.push({ ...editingGuide.value });
+    }
+    
+    giftSettings.rules[type] = [...giftList];
+  } else if (tab === 'timing') {
+    const timingList = guideList.value[currentGuideType.value] || [];
+    const index = timingList.findIndex(item => item.id === editingGuide.value.id);
+    
+    if (index > -1) {
+      timingList[index] = { ...editingGuide.value };
+    } else {
+      timingList.push({ ...editingGuide.value });
+    }
+    
+    guideList.value[currentGuideType.value] = [...timingList];
+
+    const key = guideTypeMap[currentGuideType.value];
+    if (key) {
+      timingSettings.value.contents[key] = JSON.stringify(guideList.value[currentGuideType.value]);
+    }
+  }
+  
+  showEditGuideDialog.value = false;
+};
+
+// 修改选项卡切换处理方法
+const handleTabChange = (key: string | number) => {
+  currentGuideType.value = String(key) as GuideType;
+};
+
+// 修改加载引导内容的方法
 const loadGuideContents = () => {
-  Object.keys(guideList.value).forEach(type => {
+  if (currentTab.value === 'gift') {
+    // 礼物感谢的内容已经在 loadGiftSettings 中加载
+    return;
+  }
+
+  // 加载定时引导内容
+  Object.keys(guideTypeMap).forEach(type => {
     const key = guideTypeMap[type];
     const content = timingSettings.value.contents[key];
     if (content) {
@@ -904,43 +1043,6 @@ const saveGuideContents = () => {
     const key = guideTypeMap[type];
     timingSettings.value.contents[key] = JSON.stringify(guideList.value[type]);
   });
-};
-
-// 添加引导内容
-const addGuide = () => {
-  editingGuide.value = { id: Date.now(), content: '' };
-  showEditGuideDialog.value = true;
-};
-
-// 编辑引导内容
-const editGuide = (guide: { id: number; content: string }) => {
-  editingGuide.value = { ...guide };
-  showEditGuideDialog.value = true;
-};
-
-// 删除引导内容
-const deleteGuide = (guideId: number) => {
-  const list = guideList.value[currentGuideType.value];
-  const index = list.findIndex(item => item.id === guideId);
-  if (index > -1) {
-    list.splice(index, 1);
-  }
-};
-
-// 获取当前类型的引导列表
-const getGuideList = (type: string) => {
-  const typeMap = {
-    '小额礼物感谢': 'small',
-    '大额礼物感谢': 'large',
-    '强化感谢': 'strengthen'
-  };
-  const key = typeMap[type];
-  return key ? giftSettings.rules[key] : [];
-};
-
-// 监听选项卡变化
-const handleTabChange = (key: string) => {
-  currentGuideType.value = key;
 };
 
 // 人气互动设置
@@ -1159,37 +1261,6 @@ const editingRule = ref<{ id: number; count: number; content: string }>({ id: 0,
 // 当前编辑的规则类型
 const currentRuleType = ref<'like' | 'online'>('like');
 
-// 编辑对话框显示状态
-const showEditGuideDialog = ref(false);
-
-// 当前编辑的引导内容
-const editingGuide = ref<{ id: number; content: string }>({ id: 0, content: '' });
-
-// 添加确认编辑方法
-const handleEditGuideConfirm = () => {
-  const typeMap = {
-    '小额礼物感谢': 'small',
-    '大额礼物感谢': 'large',
-    '强化感谢': 'strengthen'
-  };
-  const type = typeMap[currentGuideType.value];
-  if (!type) return;
-  
-  const list = giftSettings.rules[type];
-  const index = list.findIndex(item => item.id === editingGuide.value.id);
-  
-  if (index > -1) {
-    list[index] = { ...editingGuide.value };
-  } else {
-    list.push({ ...editingGuide.value });
-  }
-  
-  // 强制更新视图
-  giftSettings.rules[type] = [...list];
-  
-  showEditGuideDialog.value = false;
-};
-
 // 加载人气互动配置
 const loadPopularitySettings = async () => {
   if (!props.liveId) return;
@@ -1229,28 +1300,71 @@ const loadPopularitySettings = async () => {
   }
 };
 
-// 添加礼物感谢引导
-const addGiftGuide = () => {
-  editingGuide.value = { id: Date.now(), content: '' };
-  showEditGuideDialog.value = true;
-};
-
-// 编辑礼物感谢引导
-const editGiftGuide = (guide: { id: number; content: string }) => {
-  editingGuide.value = { ...guide };
-  showEditGuideDialog.value = true;
-};
-
-// 删除礼物感谢引导
-const deleteGiftGuide = (guideId: number) => {
-  const type = currentGuideType.value === '小额礼物感谢' ? 'small' : 
-               currentGuideType.value === '大额礼物感谢' ? 'large' : 'strengthen';
-  const list = giftSettings.rules[type];
-  const index = list.findIndex(item => item.id === guideId);
-  if (index > -1) {
-    list.splice(index, 1);
+// 保存人气互动配置
+const savePopularitySettings = async () => {
+  if (!props.liveId) {
+    Message.warning('直播间ID未设置');
+    return;
+  }
+  
+  try {
+    // 保存点赞配置
+    const likeConfig = await LikeConfigService.getByLiveId(props.liveId);
+    if (likeConfig?.id) {
+      await LikeConfigService.update(likeConfig.id, {
+        enable: popularitySettings.like.enable,
+        reply_way: popularitySettings.like.replyWay,
+        like_parameters: JSON.stringify(popularitySettings.like.rules),
+        platform: props.platform,
+        updater: 'system'
+      });
+    } else {
+      await LikeConfigService.create({
+        live_id: props.liveId,
+        platform: props.platform,
+        enable: popularitySettings.like.enable,
+        reply_way: popularitySettings.like.replyWay,
+        like_parameters: JSON.stringify(popularitySettings.like.rules),
+        creator: 'system'
+      });
+    }
+    
+    // 保存在线人数配置
+    const onlineConfig = await OnLineNumberConfigService.getByLiveId(props.liveId);
+    if (onlineConfig?.id) {
+      await OnLineNumberConfigService.update(onlineConfig.id, {
+        enable: popularitySettings.online.enable,
+        reply_way: popularitySettings.online.replyWay,
+        onLine_number_parameters: JSON.stringify(popularitySettings.online.rules),
+        platform: props.platform,
+        updater: 'system'
+      });
+    } else {
+      await OnLineNumberConfigService.create({
+        live_id: props.liveId,
+        platform: props.platform,
+        enable: popularitySettings.online.enable,
+        reply_way: popularitySettings.online.replyWay,
+        onLine_number_parameters: JSON.stringify(popularitySettings.online.rules),
+        creator: 'system'
+      });
+    }
+    
+    Message.success('保存成功');
+  } catch (error) {
+    console.error('保存人气互动配置失败:', error);
+    Message.error('保存失败');
   }
 };
+
+// 监听currentTab变化，自动选择对应的第一个子选项卡
+watch(() => currentTab.value, (newTab) => {
+  if (newTab === 'timing') {
+    currentGuideType.value = '综合引导';
+  } else if (newTab === 'gift') {
+    currentGuideType.value = '小额礼物感谢';
+  }
+});
 </script>
 
 <style scoped>
