@@ -1463,6 +1463,20 @@ const handleAnchorTabChange = (key: string | number) => {
   searchText.value = '';
 };
 
+// 过滤后的问答列表
+const filteredQuestionCategories = computed(() => {
+  if (!currentProduct.value?.questionCategories) return [];
+  if (!questionSearchText.value) return currentProduct.value.questionCategories;
+  
+  return currentProduct.value.questionCategories.map(category => ({
+    ...category,
+    qas: category.qas.filter(qa => 
+      qa.question.toLowerCase().includes(questionSearchText.value.toLowerCase()) ||
+      qa.answer.toLowerCase().includes(questionSearchText.value.toLowerCase())
+    )
+  })).filter(category => category.qas.length > 0);
+});
+
 </script>
 
 <template>
@@ -1811,7 +1825,7 @@ const handleAnchorTabChange = (key: string | number) => {
               <div class="bg-white rounded-lg p-4 mb-4 shadow">
                 <!-- 操作按钮和搜索框 -->
                 <div class="flex items-center gap-2 mb-4">
-                  <a-input-search v-model="questionSearchText" placeholder="搜索内容" allow-clear
+                  <a-input-search v-model="questionSearchText" placeholder="搜索问题或回答内容" allow-clear
                     @search="handleQuestionSearch" @clear="handleQuestionSearch('')" />
                   <a-button type="primary" size="small" @click="addNewCategory">
                     新增问题种类
@@ -1821,7 +1835,7 @@ const handleAnchorTabChange = (key: string | number) => {
                 <!-- 问答列表 -->
                 <div class="space-y-4">
                   <!-- 问题种类列表 -->
-                  <div v-for="category in currentProduct?.questionCategories" :key="category.id"
+                  <div v-for="category in filteredQuestionCategories" :key="category.id"
                     class="bg-[#1D1E2B] rounded-lg p-4">
                     <div class="flex items-center justify-between mb-4">
                       <div class="text-gray-300 font-medium">问题类别: {{ category.name }}</div>

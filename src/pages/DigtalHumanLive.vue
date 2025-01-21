@@ -189,7 +189,7 @@ const handleDelete = async (room: LiveBroadcastRecord, event: Event) => {
         <template #icon>
           <icon-refresh />
         </template>
-        重置
+        重置过滤条件
       </a-button>
       
       <div class="flex-grow"></div>
