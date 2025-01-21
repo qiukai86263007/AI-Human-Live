@@ -1824,13 +1824,13 @@ const handleAnchorTabChange = (key: string | number) => {
                   <div v-for="category in currentProduct?.questionCategories" :key="category.id"
                     class="bg-[#1D1E2B] rounded-lg p-4">
                     <div class="flex items-center justify-between mb-4">
-                      <div class="text-gray-300 font-medium">{{ category.name }}</div>
+                      <div class="text-gray-300 font-medium">问题类别: {{ category.name }}</div>
                       <div class="flex items-center gap-2">
                         <a-button type="text" size="mini" @click="addQA(category.id)">
                           <template #icon>
                             <icon-plus />
                           </template>
-                          添加Q&A
+                          添加问题和回答
                         </a-button>
                         <a-button type="text" size="mini" @click="editCategory(category)">
                           <template #icon>
@@ -1848,7 +1848,7 @@ const handleAnchorTabChange = (key: string | number) => {
                     <div class="space-y-2 pl-4">
                       <div v-for="qa in category.qas" :key="qa.id" class="flex flex-col gap-2 py-2">
                         <div class="flex items-center justify-between">
-                          <div class="text-gray-400">Q: {{ qa.question }}</div>
+                          <div class="text-gray-400">问题: {{ qa.question }}</div>
                           <div class="flex items-center gap-2">
                             <a-button type="text" size="mini" @click="editQA(category.id, qa)">
                               <template #icon>
@@ -1863,7 +1863,7 @@ const handleAnchorTabChange = (key: string | number) => {
                           </div>
                         </div>
                         <div class="text-gray-500 pl-4">
-                          A: {{ qa.answer }}
+                          回答: {{ qa.answer }}
                         </div>
                       </div>
                     </div>

@@ -14,12 +14,12 @@
            @click="handleSelect(platform)"
       >
         <div class="h-full flex items-center justify-center text-white">
-          <div class="text-center">
-            <img :src="`/platform-icons/${platform.icon}.png`" 
+          <div class="text-center mt-2">
+            <img :src="`/platform-icons/${platform.icon}.jpeg`" 
                  :alt="platform.name"
-                 class="w-8 h-8 mx-auto mb-1"
+                 class="w-16 h-16 mx-auto object-cover"
             />
-            <div class="text-sm">{{ platform.name }}</div>
+            <div class="text-base font-medium">{{ platform.name }}</div>
           </div>
         </div>
       </div>
@@ -57,11 +57,9 @@ const platforms = [
   { id: 1, name: '抖音', icon: 'douyin', code: 'douyin' },
   { id: 2, name: '视频号', icon: 'channels', code: 'channels' },
   { id: 3, name: '快手', icon: 'kuaishou', code: 'kuaishou' },
-  { id: 4, name: '阿里国际站', icon: 'alibaba', code: 'alibaba' },
-  { id: 5, name: 'TikTok', icon: 'tiktok', code: 'tiktok' },
-  { id: 6, name: '淘宝', icon: 'taobao', code: 'taobao' },
-  { id: 7, name: '美团', icon: 'meituan', code: 'meituan' },
-  { id: 8, name: '拼多多', icon: 'pdd', code: 'pdd' },
+  { id: 4, name: '淘宝', icon: 'taobao', code: 'taobao' },
+  { id: 5, name: '美团', icon: 'meituan', code: 'meituan' },
+  { id: 6, name: '拼多多', icon: 'pdd', code: 'pdd' },
 ];
 
 // 获取平台卡片的渐变背景
