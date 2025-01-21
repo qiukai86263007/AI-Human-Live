@@ -53,9 +53,9 @@
           </div>
 
           <!-- 信息区域 -->
-          <div class="flex-grow">
-            <div class="text-lg font-medium">{{ avatar.anchor_name }}</div>
-            <div class="text-sm text-gray-400">创建时间: {{ new Date(avatar.create_date).toLocaleString() }}</div>
+          <div class="flex-grow text-gray-400">
+            <div>{{ avatar.anchor_name }}</div>
+            <div>创建时间: {{ new Date(avatar.create_date).toLocaleString() }}</div>
           </div>
 
           <!-- 操作区域 -->
