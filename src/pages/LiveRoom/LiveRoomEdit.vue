@@ -55,9 +55,19 @@ const editingScript = ref<ProductScriptRecord | null>(null);
 const showEditScriptDialog = ref(false);
 const qaConfig = ref<QAndAConfigRecord | null>(null);
 
+// 修改直播间状态类型
+type LiveRoomState = 'editing' | 'created' | 'running' | 'live';
+
+// 添加计算属性判断是否应该禁用功能
+const shouldDisableFeatures = computed(() => {
+  const state = liveRoom.value?.state as LiveRoomState;
+  return state === 'created' || state === 'running';
+});
+
+// 修改tabs定义
 const tabs = [
   { key: '主播选择', icon: 'icon-user' },
-  { key: '产品台词', icon: 'icon-file' },
+  { key: '产品台词', icon: 'icon-file', disabled: shouldDisableFeatures },
   { key: '产品问答', icon: 'icon-question' },
   { key: '商品讲解', icon: 'icon-shopping' }
 ];
@@ -298,11 +308,13 @@ const deleteQA = async (categoryId: string, qaId: string) => {
 
   // 添加计算属性判断是否显示开始直播按钮
   const showStartLiveButton = computed(() => {
-    return liveRoom.value?.state === 'created' || liveRoom.value?.state === 'live';
+    const state = liveRoom.value?.state as LiveRoomState;
+    return state === 'created' || state === 'running';
   });
 
   const isLiveButtonText = computed(() => {
-    return liveRoom.value?.state === 'created' ? '开始直播' : '停止直播';
+    const state = liveRoom.value?.state as LiveRoomState;
+    return state === 'created' ? '开始直播' : '停止直播';
   });
 
   const canEditAISettings = computed(() => {
@@ -317,10 +329,12 @@ const handleStartLive = async () => {
   }
 
   try {
-    const newState = liveRoom.value?.state === 'created' ? 'live' : 'created';
-    const actionText = newState === 'live' ? '启动' : '停止';
+    const state = liveRoom.value?.state as LiveRoomState;
+    const newState: LiveRoomState = state === 'created' ? 'running' : 'created';
+    const actionText = newState === 'running' ? '启动' : '停止';
+    
     // 如果是要开始直播，显示确认对话框
-    if (newState === 'live') {
+    if (newState === 'running') {
       const confirmResult = await Modal.confirm({
         title: '开启场控',
         content: '是否同时开启场控？',
@@ -328,15 +342,13 @@ const handleStartLive = async () => {
         cancelText: '否',
         onOk: () => {
           Message.success('场控已开启');
-          // 开启场控逻辑，传入平台数据（房间号，主播名）
-          // 读取场控规则，开始场控
         },
         onCancel: () => {
           Message.success('场控已关闭');
         }
       });
-
     }
+    
     Message.loading(`正在${actionText}直播...`);
     await LiveBroadcastService.update(liveId, {
       state: newState,
@@ -344,7 +356,7 @@ const handleStartLive = async () => {
       updater: 'current_user'
     });
 
-    await loadLiveRoom(); // 重新加载直播间信息
+    await loadLiveRoom();
     Message.success(`直播已${actionText}`);
   } catch (error) {
     console.error('启动直播失败:', error);
@@ -746,6 +758,12 @@ const handleDelete = async () => {
 
 // 添加选项卡切换处理函数
 const handleTabChange = (tab: string) => {
+  // 如果标签被禁用，则不允许切换
+  const tabConfig = tabs.find(t => t.key === tab);
+  if (tabConfig?.disabled?.value) {
+    return;
+  }
+  
   if (!currentProduct.value) {
     Message.warning('请先选择产品');
     return;
@@ -1578,13 +1596,17 @@ const filteredQuestionCategories = computed(() => {
           </template>
         </div>
         <div class="p-4">
-          <a-button type="primary" class="w-full mb-2" status="primary" @click="handleCreateProduct">
+          <a-button type="primary" class="w-full mb-2" status="primary" 
+            :disabled="shouldDisableFeatures" 
+            @click="handleCreateProduct">
             <template #icon>
               <icon-plus />
             </template>
             新建产品
           </a-button>
-          <a-button type="primary" class="w-full" @click="handleStartClone">
+          <a-button type="primary" class="w-full" 
+            :disabled="shouldDisableFeatures"
+            @click="handleStartClone">
             <template #icon>
               <icon-play />
             </template>
@@ -1595,11 +1617,15 @@ const filteredQuestionCategories = computed(() => {
 
       <!-- 左侧导航栏 -->
       <div class="w-20 flex-shrink-0 border-r border-gray-800">
-        <div v-for="tab in tabs" :key="tab.key" class="py-4 px-2 cursor-pointer flex flex-col items-center" :class="{
-               'bg-blue-500/10 text-blue-500': currentTab === tab.key,
-               'text-gray-400': currentTab !== tab.key,
-               'cursor-not-allowed': !currentProduct
-             }" @click="handleTabChange(tab.key)">
+        <div v-for="tab in tabs" :key="tab.key" 
+          class="py-4 px-2 cursor-pointer flex flex-col items-center" 
+          :class="{
+            'bg-blue-500/10 text-blue-500': currentTab === tab.key,
+            'text-gray-400': currentTab !== tab.key,
+            'cursor-not-allowed opacity-50': tab.disabled?.value,
+            'cursor-not-allowed': !currentProduct
+          }" 
+          @click="handleTabChange(tab.key)">
           <i :class="tab.icon" class="text-xl mb-1"></i>
           <span class="text-xs">{{ tab.key }}</span>
         </div>
@@ -1625,14 +1651,17 @@ const filteredQuestionCategories = computed(() => {
             </div>
           </div>
           <div class="mt-4 flex justify-center">
-            <a-button type="outline" :disabled="!currentProduct || !selectedAnchor" @click="saveCurrentSettings">
+            <a-button type="outline" 
+              :disabled="!currentProduct || !selectedAnchor || shouldDisableFeatures" 
+              @click="saveCurrentSettings">
               保存当前设置
             </a-button>
           </div>
           <div class="mt-4 flex justify-center">
             <a-button v-if="showStartLiveButton" type="primary"
               :status="liveRoom?.state === 'created' ? 'success' : 'danger'"
-              :disabled="!currentProduct || !selectedAnchor" @click="handleStartLive">
+              :disabled="!currentProduct || !selectedAnchor" 
+              @click="handleStartLive">
               {{ isLiveButtonText }}
             </a-button>
           </div>
