@@ -6,9 +6,16 @@ export class PathManager {
    */
   static toStoragePath(filePath: string): string {
     // 统一使用正斜杠
-    const normalizedPath = filePath.replace(/\\/g, '/');
+    let normalizedPath = filePath.replace(/\\/g, '/');
+    
+    // Windows 系统下处理盘符路径
+    if (process.platform === 'win32' && /^[a-zA-Z]:/i.test(normalizedPath)) {
+      // 确保路径以单个斜杠开头
+      normalizedPath = normalizedPath.replace(/^\/+/, '');
+    }
+
     // 转换为 file:// URL 格式
-    return new URL(`file://${normalizedPath}`).href;
+    return `file:///${normalizedPath}`;
   }
 
   /**
@@ -18,7 +25,16 @@ export class PathManager {
    */
   static fromStoragePath(urlPath: string): string {
     const fileUrl = new URL(urlPath);
-    // URL.pathname 会自动处理为当前系统的路径格式
-    return decodeURIComponent(fileUrl.pathname);
+    let path = decodeURIComponent(fileUrl.pathname);
+    
+    // Windows 系统下处理路径
+    if (process.platform === 'win32') {
+      // 移除开头的斜杠（针对 Windows 盘符路径）
+      path = path.replace(/^\/+([a-zA-Z]:)/, '$1');
+      // 转换为反斜杠（Windows 标准路径格式）
+      path = path.replace(/\//g, '\\');
+    }
+    
+    return path;
   }
-} 
+}
