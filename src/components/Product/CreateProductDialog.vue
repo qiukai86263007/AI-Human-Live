@@ -135,14 +135,14 @@ defineExpose({
         >
           <a-option value="type1">服饰内衣</a-option>
           <a-option value="type2">食品美食</a-option>
-          <a-option value="type2">美妆护肤</a-option>
-          <a-option value="type3">母婴用品</a-option>
-          <a-option value="type4">数码家电</a-option>
-          <a-option value="type5">家居生活</a-option>
-          <a-option value="type6">运动户外</a-option>
-          <a-option value="type7">汽车用品</a-option>
-          <a-option value="type8">图书音像</a-option>
-          <a-option value="type9">其他</a-option>
+          <a-option value="type3">美妆护肤</a-option>
+          <a-option value="type4">母婴用品</a-option>
+          <a-option value="type5">数码家电</a-option>
+          <a-option value="type6">家居生活</a-option>
+          <a-option value="type7">运动户外</a-option>
+          <a-option value="type8">汽车用品</a-option>
+          <a-option value="type9">图书音像</a-option>
+          <a-option value="type10">其他</a-option>
         </a-select>
       </a-form-item>
 
@@ -180,4 +180,4 @@ defineExpose({
       </div>
     </a-form>
   </a-modal>
-</template> 
+</template>
