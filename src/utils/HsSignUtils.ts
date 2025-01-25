@@ -92,7 +92,6 @@ export function sign(params) {
     const kService = hmac(kRegion, serviceName);
     const kSigning = hmac(kService, "request");
     const signature = hmac(kSigning, stringToSign).toString('hex');
-    debuglog('--------CanonicalString:\n%s\n--------SignString:\n%s', canonicalRequest, stringToSign);
 
     return [
         "HMAC-SHA256",
