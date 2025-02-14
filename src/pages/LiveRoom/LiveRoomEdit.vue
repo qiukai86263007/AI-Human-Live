@@ -21,10 +21,12 @@ import SpeechAttributeService, { SpeechAttributeRecord } from '../../service/Spe
 import AudioCharacterService, { AudioCharacterRecord } from '../../service/AudioCharacterService';
 import { PathManager } from '../../utils/pathManager';
 import { textToSpeech } from '../../utils/HsTtsUtils';
+import SceneControlDialog from './SceneControlDialog.vue';
+import { IconLeft, IconEdit, IconCheck, IconRobot, IconDelete, IconStorage, IconPlus, IconPlayCircle, IconPauseCircle, IconComputer, IconSend, IconImage } from '@arco-design/web-vue/es/icon';
 
 const router = useRouter();
 const route = useRoute();
-const emit = defineEmits(['refresh']);
+const emit = defineEmits(['refresh', 'onNewComment', 'sendComment']);
 const currentTab = ref('主播选择');
 const currentPage = ref(1);
 const createProductDialog = ref();
@@ -54,6 +56,7 @@ const selectedScriptId = ref<string>(''); // 当前选中的台词ID
 const editingScript = ref<ProductScriptRecord | null>(null);
 const showEditScriptDialog = ref(false);
 const qaConfig = ref<QAndAConfigRecord | null>(null);
+const showSceneControlDialog = ref(false);
 
 // 修改直播间状态类型
 type LiveRoomState = 'editing' | 'created' | 'running' | 'live';
@@ -335,21 +338,33 @@ const handleStartLive = async () => {
     
     // 如果是要开始直播，显示确认对话框
     if (newState === 'running') {
-      const confirmResult = await Modal.confirm({
+      Modal.confirm({
         title: '开启场控',
         content: '是否同时开启场控？',
         okText: '是',
         cancelText: '否',
         onOk: () => {
-          Message.success('场控已开启');
+          showSceneControlDialog.value = true;
         },
         onCancel: () => {
           Message.success('场控已关闭');
+          updateLiveState(newState);
         }
       });
+    } else {
+      updateLiveState(newState);
     }
-    
-    Message.loading(`正在${actionText}直播...`);
+  } catch (error) {
+    console.error('启动直播失败:', error);
+    Message.error('启动直播失败');
+  }
+};
+
+// 添加更新直播状态的方法
+const updateLiveState = async (newState: LiveRoomState) => {
+  const liveId = route.query.id as string;
+  try {
+    Message.loading(`正在${newState === 'running' ? '启动' : '停止'}直播...`);
     await LiveBroadcastService.update(liveId, {
       state: newState,
       update_date: new Date().toISOString(),
@@ -357,10 +372,24 @@ const handleStartLive = async () => {
     });
 
     await loadLiveRoom();
-    Message.success(`直播已${actionText}`);
+    Message.success(`直播已${newState === 'running' ? '启动' : '停止'}`);
   } catch (error) {
-    console.error('启动直播失败:', error);
-    Message.error('启动直播失败');
+    console.error('更新直播状态失败:', error);
+    Message.error('更新直播状态失败');
+  }
+};
+
+// 添加场控设置确认处理方法
+const handleSceneControlConfirm = async (settings: any) => {
+  try {
+    // 这里可以添加保存场控设置的逻辑
+    console.log('Scene control settings:', settings);
+    Message.success('场控设置已保存');
+    // 更新直播状态为运行中
+    await updateLiveState('running');
+  } catch (error) {
+    console.error('保存场控设置失败:', error);
+    Message.error('保存场控设置失败');
   }
 };
 
@@ -809,53 +838,57 @@ const isTextPlaying = ref(false);
 const audioTextPlayer = ref<HTMLAudioElement | null>(null);
 // 处理台词试听
 const handlePreviewScript = async (script: ProductScriptRecord, event: Event) => {
+  // 只在开启场控后允许试听
+  if (!showSceneControlDialog.value) {
+    Message.warning('请先开启场控');
+    return;
+  }
+
   if (event) {
     event.stopPropagation();
   }
 
   try {
-    console.log('script.id', script.id);
-    console.log('playingScriptId', playingScriptId.value);
     // 如果正在播放，则停止
-      // 如果当前脚本正在播放,则停止播放
-      if (playingScriptId.value === script.id) {
-          if (audioTextPlayer.value) {
-            audioTextPlayer.value.pause();
-            audioTextPlayer.value.currentTime = 0;
-          }
-          playingScriptId.value = null;
-          return;
+    if (playingScriptId.value === script.id) {
+      if (audioTextPlayer.value) {
+        audioTextPlayer.value.pause();
+        audioTextPlayer.value.currentTime = 0;
       }
+      playingScriptId.value = null;
+      return;
+    }
+
     Message.loading('正在生成语音...');
-      const buffer = await textToSpeech(
-        selectedVoice.value.app_key || '',
-        selectedVoice.value.access_key_secret || '',
-        script.text_content,
-        selectedVoice.value.voice_id || ''
-      );
+    const buffer = await textToSpeech(
+      selectedVoice.value.app_key || '',
+      selectedVoice.value.access_key_secret || '',
+      script.text_content,
+      selectedVoice.value.voice_id || ''
+    );
 
-      // 保存音频文件
-      const fileName = `audio/${script.id}.wav`;
-      const fullPath = await window.$mapi.file.fullPath(fileName);
-      await window.$mapi.file.mkdir('audio', { isFullPath: true });
-      await window.$mapi.file.writeBuffer(fullPath, buffer, { isFullPath: true });
+    // 保存音频文件
+    const fileName = `audio/${script.id}.wav`;
+    const fullPath = await window.$mapi.file.fullPath(fileName);
+    await window.$mapi.file.mkdir('audio', { isFullPath: true });
+    await window.$mapi.file.writeBuffer(fullPath, buffer, { isFullPath: true });
 
-      // 更新数据库中的音频URL
-      const storagePath = PathManager.toStoragePath(fullPath);
-      await ProductScriptService.update(script.id!, {
-        audio_url: storagePath,
-        updater: 'current_user'
-      });
+    // 更新数据库中的音频URL
+    const storagePath = PathManager.toStoragePath(fullPath);
+    await ProductScriptService.update(script.id!, {
+      audio_url: storagePath,
+      updater: 'current_user'
+    });
+
     // 创建音频播放器
     audioTextPlayer.value = new Audio(storagePath+'?t='+Date.now());
     playingScriptId.value = script.id;
+
     // 监听播放结束事件
     audioTextPlayer.value.onended = () => {
-        playingScriptId.value = null;
-      // 重置音频播放位置
+      playingScriptId.value = null;
       if (audioTextPlayer.value) {
         audioTextPlayer.value.currentTime = 0;
-          playingScriptId.value = null;
       }
       audioTextPlayer.value = null;
     };
@@ -873,7 +906,6 @@ const handlePreviewScript = async (script: ProductScriptRecord, event: Event) =>
   } catch (error) {
     console.error('试听失败:', error);
     Message.error('试听失败');
-    isTextPlaying.value = false;
     if (audioTextPlayer.value) {
       audioTextPlayer.value.currentTime = 0;
     }
@@ -1236,8 +1268,13 @@ const isPlaying = ref(false);
 const audioPlayer = ref<HTMLAudioElement | null>(null);
 
 // 修改试听方法
-// 修改试听方法
 const handlePreviewVoice = async () => {
+  // 只在开启场控后允许试听
+  if (!showSceneControlDialog.value) {
+    Message.warning('请先开启场控');
+    return;
+  }
+
   if (!selectedVoice.value?.audio_url) {
     Message.warning('当前主播没有试听音频');
     return;
@@ -1247,7 +1284,6 @@ const handlePreviewVoice = async () => {
     // 如果正在播放，则停止
     if (isPlaying.value && audioPlayer.value) {
       audioPlayer.value.pause();
-      // 重置音频播放位置
       audioPlayer.value.currentTime = 0;
       audioPlayer.value = null;
       isPlaying.value = false;
@@ -1260,7 +1296,6 @@ const handlePreviewVoice = async () => {
     // 监听播放结束事件
     audioPlayer.value.onended = () => {
       isPlaying.value = false;
-      // 重置音频播放位置
       if (audioPlayer.value) {
         audioPlayer.value.currentTime = 0;
       }
@@ -1296,7 +1331,8 @@ onMounted(() => {
   loadAnchors();
   loadRuleSettings();
   loadLiveParameter();
-  loadCurrentVoice(); // 添加这一行
+  // 移除自动加载声音配置
+  // loadCurrentVoice();
 });
 
 // 打开平台设置
@@ -1320,9 +1356,10 @@ onUnmounted(() => {
   }
 });
 
-// 加载当前主播声音配置
+// 修改加载当前主播声音配置的方法
 const loadCurrentVoice = async () => {
-  if (!currentProduct.value?.id || !route.query.id) return;
+  // 只在开启场控后加载声音配置
+  if (!currentProduct.value?.id || !route.query.id || !showSceneControlDialog.value) return;
 
   try {
     // 从speech_attribute表获取voice配置
@@ -1495,6 +1532,61 @@ const filteredQuestionCategories = computed(() => {
   })).filter(category => category.qas.length > 0);
 });
 
+// 在 script 部分添加
+const publicScreenComments = ref<Array<{username: string, content: string, time: string, id: string}>>([]);
+
+// 添加处理新弹幕的方法
+const handleNewComments = (newComments: Array<{username: string, content: string, time: string, id: string}>) => {
+  if (newComments.length === 0) {
+    // 如果收到空数组，则清空公屏
+    publicScreenComments.value = [];
+    return;
+  }
+  
+  publicScreenComments.value.push(...newComments);
+  // 保持最新的 50 条弹幕
+  if (publicScreenComments.value.length > 50) {
+    publicScreenComments.value = publicScreenComments.value.slice(-50);
+  }
+};
+
+// 添加评论相关的响应式变量
+const commentText = ref('');
+
+// 修改发送评论的方法
+const sendComment = async () => {
+  if (!commentText.value) {
+    Message.warning('请输入评论内容');
+    return;
+  }
+
+  if (!showSceneControlDialog.value) {
+    Message.warning('请先开启场控');
+    return;
+  }
+
+  try {
+    await sceneControlDialogRef.value?.sendComment(commentText.value);
+    commentText.value = '';
+    Message.success('评论发送成功');
+  } catch (error) {
+    console.error('发送评论失败:', error);
+    Message.error('发送评论失败：' + error);
+  }
+};
+
+// 添加场控对话框关闭的处理方法
+const handleSceneControlClose = () => {
+  showSceneControlDialog.value = false;
+  // 停止直播状态
+  updateLiveState('created');
+  // 清空公屏信息
+  publicScreenComments.value = [];
+};
+
+// 添加场控对话框的引用
+const sceneControlDialogRef = ref<InstanceType<typeof SceneControlDialog> | null>(null);
+
 </script>
 
 <template>
@@ -1504,7 +1596,7 @@ const filteredQuestionCategories = computed(() => {
       <div class="flex items-center flex-1">
         <a-button type="text" class="text-gray-400 w-24" @click="router.push('/live')">
           <template #icon>
-            <icon-left />
+            <IconLeft />
           </template>
           返回主页
         </a-button>
@@ -1513,8 +1605,8 @@ const filteredQuestionCategories = computed(() => {
             :class="{ 'cursor-default': !isEditing }" />
           <a-button type="text" class="text-gray-400 ml-2" @click="toggleEdit">
             <template #icon>
-              <icon-edit v-if="!isEditing" />
-              <icon-check v-else />
+              <IconEdit v-if="!isEditing" />
+              <IconCheck v-else />
             </template>
             {{ isEditing ? '保存' : '编辑' }}
           </a-button>
@@ -1523,7 +1615,7 @@ const filteredQuestionCategories = computed(() => {
       <div class="flex-shrink-0">
         <a-button type="outline" status="success" @click="showPlatformDialog = true">
           <template #icon>
-            <icon-robot />
+            <IconRobot />
           </template>
           AI智能互动设置
         </a-button>
@@ -1544,7 +1636,7 @@ const filteredQuestionCategories = computed(() => {
             </a-checkbox>
             <a-button size="mini" status="danger" :disabled="selectedProducts.length === 0" @click="handleDelete">
               <template #icon>
-                <icon-delete />
+                <IconDelete />
               </template>
               删除
             </a-button>
@@ -1555,7 +1647,7 @@ const filteredQuestionCategories = computed(() => {
             <div class="h-full flex items-center justify-center text-gray-500">
               <div class="text-center">
                 <div class="mb-4">
-                  <icon-box class="text-4xl" />
+                  <IconStorage class="text-4xl" />
                 </div>
               </div>
             </div>
@@ -1578,7 +1670,7 @@ const filteredQuestionCategories = computed(() => {
                   <img v-if="product.product_backroud" :src="product.product_backroud"
                     class="w-full h-full object-cover rounded" :alt="product.product_name" />
                   <div v-else class="w-full h-full bg-gray-200 rounded flex items-center justify-center">
-                    <icon-image class="text-gray-400" />
+                    <IconImage class="text-gray-400" />
                   </div>
                 </div>
 
@@ -1600,7 +1692,7 @@ const filteredQuestionCategories = computed(() => {
             :disabled="shouldDisableFeatures" 
             @click="handleCreateProduct">
             <template #icon>
-              <icon-plus />
+              <IconPlus />
             </template>
             新建产品
           </a-button>
@@ -1608,7 +1700,7 @@ const filteredQuestionCategories = computed(() => {
             :disabled="shouldDisableFeatures"
             @click="handleStartClone">
             <template #icon>
-              <icon-play />
+              <IconPlayCircle />
             </template>
             开始克隆
           </a-button>
@@ -1660,7 +1752,6 @@ const filteredQuestionCategories = computed(() => {
           <div class="mt-4 flex justify-center">
             <a-button v-if="showStartLiveButton" type="primary"
               :status="liveRoom?.state === 'created' ? 'success' : 'danger'"
-              :disabled="!currentProduct || !selectedAnchor" 
               @click="handleStartLive">
               {{ isLiveButtonText }}
             </a-button>
@@ -1686,7 +1777,7 @@ const filteredQuestionCategories = computed(() => {
                   </a-checkbox>
                   <a-button size="mini" status="danger" :disabled="!selectedScriptId" @click="handleDeleteScript">
                     <template #icon>
-                      <icon-delete />
+                      <IconDelete />
                     </template>
                     删除
                   </a-button>
@@ -1717,14 +1808,14 @@ const filteredQuestionCategories = computed(() => {
                           <a-tag>{{ script.script_type_id === 'manual' ? '文本' : 'AI' }}</a-tag>
                           <a-button size="mini" @click="(e) => handleEditScript(script, e)">
                             <template #icon>
-                              <icon-edit />
+                              <IconEdit />
                             </template>
                           </a-button>
                           <a-button type="outline" status="success" size="mini"
                             @click="(e) => handlePreviewScript(script, e)">
                             <template #icon>
-                              <icon-pause-circle v-if="playingScriptId === script.id" />
-                              <icon-play-circle v-else />
+                              <IconPauseCircle v-if="playingScriptId === script.id" />
+                              <IconPlayCircle v-else />
                             </template>
                             {{ playingScriptId === script.id ? '停止' : '试听' }}
                           </a-button>
@@ -1770,8 +1861,8 @@ const filteredQuestionCategories = computed(() => {
                             </a-button>
                             <a-button size="mini" type="outline" status="success" @click="handlePreviewVoice">
                               <template #icon>
-                                <icon-play-circle v-if="!isPlaying" />
-                                <icon-pause-circle v-else />
+                                <IconPlayCircle v-if="!isPlaying" />
+                                <IconPauseCircle v-else />
                               </template>
                               {{ isPlaying ? '停止' : '试听' }}
                             </a-button>
@@ -1871,18 +1962,18 @@ const filteredQuestionCategories = computed(() => {
                       <div class="flex items-center gap-2">
                         <a-button type="text" size="mini" @click="addQA(category.id)">
                           <template #icon>
-                            <icon-plus />
+                            <IconPlus />
                           </template>
                           添加问题和回答
                         </a-button>
                         <a-button type="text" size="mini" @click="editCategory(category)">
                           <template #icon>
-                            <icon-edit />
+                            <IconEdit />
                           </template>
                         </a-button>
                         <a-button type="text" size="mini" status="danger" @click="deleteCategory(category.id)">
                           <template #icon>
-                            <icon-delete />
+                            <IconDelete />
                           </template>
                         </a-button>
                       </div>
@@ -1895,12 +1986,12 @@ const filteredQuestionCategories = computed(() => {
                           <div class="flex items-center gap-2">
                             <a-button type="text" size="mini" @click="editQA(category.id, qa)">
                               <template #icon>
-                                <icon-edit />
+                                <IconEdit />
                               </template>
                             </a-button>
                             <a-button type="text" size="mini" status="danger" @click="deleteQA(category.id, qa.id)">
                               <template #icon>
-                                <icon-delete />
+                                <IconDelete />
                               </template>
                             </a-button>
                           </div>
@@ -2058,22 +2149,42 @@ const filteredQuestionCategories = computed(() => {
             <div>
               <div class="mb-6">
                 <div class="text-base mb-4">直播间公屏</div>
-                <div class="h-96 bg-[#2A2B3C] rounded flex items-center justify-center">
-                  <div class="text-center text-gray-400">
-                    <div class="mb-2">
-                      <icon-monitor class="text-3xl" />
+                <div class="h-96 bg-[#2A2B3C] rounded p-4 overflow-y-auto">
+                  <template v-if="publicScreenComments.length > 0">
+                    <div v-for="comment in publicScreenComments" :key="comment.id" class="mb-2 text-white">
+                      <span class="text-blue-400">{{ comment.username }}:</span>
+                      <span class="ml-2">{{ comment.content }}</span>
+                      <span class="text-xs text-gray-400 ml-2">{{ comment.time }}</span>
                     </div>
-                    <div>暂无公屏信息</div>
-                  </div>
+                  </template>
+                  <template v-else>
+                    <div class="text-center text-gray-400 h-full flex items-center justify-center">
+                      <div>
+                        <div class="mb-2">
+                          <IconComputer class="text-3xl" />
+                        </div>
+                        <div>暂无公屏信息</div>
+                      </div>
+                    </div>
+                  </template>
                 </div>
               </div>
 
               <!-- 底部按钮 -->
               <div class="flex gap-4 justify-center">
-                <a-input class="flex-1" placeholder="请输入消息内容" :disabled="canEditAISettings" />
-                <a-button type="primary" :disabled="canEditAISettings">
+                <a-input 
+                  class="flex-1" 
+                  v-model="commentText"
+                  placeholder="请输入消息内容" 
+                  :maxLength="40"
+                  @keyup.enter="sendComment"
+                />
+                <a-button 
+                  type="primary" 
+                  @click="sendComment"
+                >
                   <template #icon>
-                    <icon-send />
+                    <IconSend />
                   </template>
                   发送
                 </a-button>
@@ -2128,6 +2239,18 @@ const filteredQuestionCategories = computed(() => {
       <a-button type="primary" @click="handleSaveScript">保存</a-button>
     </template>
   </a-modal>
+
+  <!-- 场控设置弹窗 -->
+  <SceneControlDialog 
+    ref="sceneControlDialogRef"
+    v-model="showSceneControlDialog" 
+    :roomId="roomIdDemo"
+    :welcome-guide="rulesDemo.welcomeGuide"
+    @confirm="handleSceneControlConfirm" 
+    @onNewComments="handleNewComments"
+    @update:visible="(val) => !val && handleSceneControlClose()"
+  />
+
 </template>
 
 <style scoped>

@@ -315,6 +315,19 @@ ipcMain.handle('app:getBuildInfo', async () => {
     return getBuildInfo()
 })
 
+// Add new IPC handlers for window position management
+ipcMain.handle('get-window-position', (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  return window ? window.getPosition() : [0, 0];
+});
+
+ipcMain.handle('set-window-position', (event, x: number, y: number) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (window) {
+    window.setPosition(Math.round(x), Math.round(y));
+  }
+});
+
 export default {
     quit
 }
