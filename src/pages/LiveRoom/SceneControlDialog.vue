@@ -449,7 +449,6 @@ const startAutoReply = async () => {
     autoReplyInterval.value = window.setInterval(autoReply, intervalTime);
   } catch (error) {
     console.error('获取发送间隔时间失败:', error);
-    // 如果获取失败，使用默认的10秒
     autoReplyInterval.value = window.setInterval(autoReply, 10000);
   }
 };
