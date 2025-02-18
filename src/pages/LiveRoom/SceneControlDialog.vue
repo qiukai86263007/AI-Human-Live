@@ -366,16 +366,16 @@ const sendComment = async (text: string) => {
     const script = platform.value === 'kuaishou' 
       ? `
         (() => {
-          const container = document.querySelector('div.comment-input[data-v-31e9cfba][data-v-3e0b7ef0]');
-          if (!container) throw new Error('找不到评论输入框');
+          const container = document.querySelector('div.chat-actions');
+          if (!container) throw new Error('找不到评论区容器');
           
-          const input = container.querySelector('textarea[max-length="40"]');
+          const input = container.querySelector('textarea.box-boder[max-length="40"]');
           if (!input) throw new Error('找不到输入框元素');
           
           input.value = ${JSON.stringify(text)};
           input.dispatchEvent(new Event('input', { bubbles: true }));
           
-          const sendBtn = container.querySelector('div.submit-button[data-v-3e0b7ef0]');
+          const sendBtn = container.querySelector('div.submit-button');
           if (!sendBtn) throw new Error('找不到发送按钮');
           
           setTimeout(() => {
@@ -550,44 +550,7 @@ const sendAutoReply = async (comment: {username: string, id: string}) => {
     // 如果有回复内容，发送回复
     if (replyText) {
       console.log('Selected reply:', replyText);
-
-      // 使用与 sendComment 相同的发送脚本
-      const script = platform.value === 'kuaishou' 
-        ? `
-          (() => {
-            const container = document.querySelector('div.comment-input[data-v-31e9cfba][data-v-3e0b7ef0]');
-            if (!container) throw new Error('找不到评论输入框');
-            
-            const input = container.querySelector('textarea[max-length="40"]');
-            if (!input) throw new Error('找不到输入框元素');
-            
-            input.value = ${JSON.stringify(replyText)};
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            
-            const sendBtn = container.querySelector('div.submit-button[data-v-3e0b7ef0]');
-            if (!sendBtn) throw new Error('找不到发送按钮');
-            
-            setTimeout(() => {
-              sendBtn.click();
-            }, 100);
-          })()
-        `
-        : `
-          (() => {
-            const input = document.querySelector('.webcast-chatroom___textarea');
-            if (!input) throw new Error('找不到评论输入框');
-            
-            input.value = ${JSON.stringify(replyText)};
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            
-            const sendBtn = document.querySelector('.webcast-chatroom___send-btn');
-            if (!sendBtn) throw new Error('找不到发送按钮');
-            
-            sendBtn.click();
-          })()
-        `;
-
-      await webviewRef.value.executeJavaScript(script);
+      await sendComment(replyText);
     }
   } catch (error) {
     console.error('Auto reply failed:', error);
