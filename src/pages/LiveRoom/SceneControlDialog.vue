@@ -418,9 +418,16 @@ const handleSendComment = async () => {
   }
 };
 
-const startAutoReply = () => {
+const startAutoReply = async () => {
   // 如果两个功能都没开启，或者已经有定时器在运行，就返回
   if ((!props.welcomeGuide && !props.productQA) || autoReplyInterval.value) return;
+
+  // 从数据库获取发送间隔时间
+  const configSql = `SELECT interval_time 
+    FROM regular_interaction_config 
+    WHERE state = 'normal' 
+    ORDER BY create_date DESC 
+    LIMIT 1`;
 
   const autoReply = async () => {
     const unrepliedComments = comments.value.filter(comment => !repliedComments.has(comment.id));
@@ -436,7 +443,15 @@ const startAutoReply = () => {
     }
   };
 
-  autoReplyInterval.value = window.setInterval(autoReply, 10000);
+  try {
+    const result = await window.$mapi.db.first(configSql);
+    const intervalTime = result?.interval_time ? result.interval_time * 1000 : 10000; // 默认10秒
+    autoReplyInterval.value = window.setInterval(autoReply, intervalTime);
+  } catch (error) {
+    console.error('获取发送间隔时间失败:', error);
+    // 如果获取失败，使用默认的10秒
+    autoReplyInterval.value = window.setInterval(autoReply, 10000);
+  }
 };
 
 const stopAutoReply = () => {
