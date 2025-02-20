@@ -151,6 +151,9 @@ const resizeDirection = ref('');
 let startSize = { width: 0, height: 0 };
 let startResizePos = { x: 0, y: 0 };
 
+// Add productQA interval
+const productQAInterval = ref<number | null>(null);
+
 // Add watch for modelValue
 watch(() => props.modelValue, (newVal) => {
   if (newVal) {
@@ -436,6 +439,7 @@ const startAutoReply = async () => {
   if (platform.value === 'kuaishou') {
     console.log('满足启动条件，开始启动自动回复');
     const autoReply = async () => {
+      console.log('autoReply进入');
       const unrepliedComments = comments.value.filter(comment => !repliedComments.has(comment.id));
       if (unrepliedComments.length > 0) {
         const commentToReply = unrepliedComments[0];
@@ -453,26 +457,39 @@ const startAutoReply = async () => {
       // 清除旧的定时器
       if (autoReplyInterval.value) {
         clearInterval(autoReplyInterval.value);
+        autoReplyInterval.value = null;
+      }
+      if (productQAInterval.value) {
+        clearInterval(productQAInterval.value);
+        productQAInterval.value = null;
       }
 
-      // 如果产品问答开启，立即开始处理评论
+      // 如果产品问答开启，设置独立的定时器
       if (props.productQA) {
-        console.log('产品问答功能已开启，立即开始处理评论');
+        console.log('产品问答功能已开启，开始持续处理评论');
+        // 立即执行一次
         autoReply();
+        // 设置产品问答的定时器，1秒间隔
+        productQAInterval.value = window.setInterval(autoReply, 1000);
+        console.log('产品问答定时器已设置，间隔: 1000ms');
       }
       
-      // 如果定时引导开启，设置定时器
+      // 如果定时引导开启，设置独立的定时器
       if (props.welcomeGuide) {
         const { intervalTime } = await getGuideReplyContent();
-        console.log('设置定时器的间隔时间:', intervalTime, 'ms');
+        console.log('设置定时引导间隔时间:', intervalTime, 'ms');
+        // 设置定时引导的定时器
         autoReplyInterval.value = window.setInterval(autoReply, intervalTime);
-        console.log('定时器已设置，实际间隔:', intervalTime, 'ms');
+        console.log('定时引导定时器已设置，实际间隔:', intervalTime, 'ms');
       }
     } catch (error) {
       console.error('启动自动回复失败:', error);
-      // 发生错误时，如果定时引导开启则使用默认间隔
+      // 发生错误时分别设置默认间隔
       if (props.welcomeGuide) {
         autoReplyInterval.value = window.setInterval(autoReply, 10000);
+      }
+      if (props.productQA) {
+        productQAInterval.value = window.setInterval(autoReply, 1000);
       }
     }
   } else {
@@ -484,6 +501,10 @@ const stopAutoReply = () => {
   if (autoReplyInterval.value) {
     clearInterval(autoReplyInterval.value);
     autoReplyInterval.value = null;
+  }
+  if (productQAInterval.value) {
+    clearInterval(productQAInterval.value);
+    productQAInterval.value = null;
   }
 };
 
@@ -642,8 +663,8 @@ const sendAutoReply = async (comment: {username: string, id: string, content: st
       }
     }
 
-    // 只有在产品问答未匹配且定时引导开启时，才使用定时引导
-    if (!props.productQA && props.welcomeGuide) {
+    // 定时引导功能独立运行
+    if (props.welcomeGuide) {
       console.log('开始处理定时引导回复');
       const { content } = await getGuideReplyContent();
       if (content) {
