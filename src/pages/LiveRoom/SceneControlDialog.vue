@@ -419,16 +419,6 @@ const handleSendComment = async () => {
 };
 
 const startAutoReply = async () => {
-  // 如果两个功能都没开启，或者已经有定时器在运行，就返回
-  if ((!props.welcomeGuide && !props.productQA) || autoReplyInterval.value) return;
-
-  // 从数据库获取发送间隔时间
-  const configSql = `SELECT interval_time 
-    FROM regular_interaction_config 
-    WHERE state = 'normal' 
-    ORDER BY create_date DESC 
-    LIMIT 1`;
-
   const autoReply = async () => {
     const unrepliedComments = comments.value.filter(comment => !repliedComments.has(comment.id));
     if (unrepliedComments.length > 0) {
@@ -444,12 +434,22 @@ const startAutoReply = async () => {
   };
 
   try {
-    const result = await window.$mapi.db.first(configSql);
-    const intervalTime = result?.interval_time ? result.interval_time * 1000 : 10000; // 默认10秒
+    // 获取第一次引导内容和时间间隔
+    const { intervalTime } = await getGuideReplyContent();
+    console.log('设置定时器的间隔时间:', intervalTime, 'ms');
+    const lastIntervalTime = autoReplyInterval.value;
+    
+    // 清除旧的定时器
+    if (lastIntervalTime) {
+      clearInterval(lastIntervalTime);
+    }
+    
+    // 设置新的定时器
     autoReplyInterval.value = window.setInterval(autoReply, intervalTime);
+    console.log('定时器已设置，实际间隔:', intervalTime, 'ms');
   } catch (error) {
-    console.error('获取发送间隔时间失败:', error);
-    autoReplyInterval.value = window.setInterval(autoReply, 10000);
+    console.error('启动自动回复失败:', error);
+    autoReplyInterval.value = window.setInterval(autoReply, 10000); // 发生错误时使用默认间隔
   }
 };
 
@@ -460,111 +460,94 @@ const stopAutoReply = () => {
   }
 };
 
+const getGuideReplyContent = async () => {
+  // 从数据库获取定时引导的内容、概率字段和时间间隔
+  const guideSql = `SELECT 
+    guide_all_contents, guide_follow_contents, 
+    guide_cost_contents, guide_share_contents,
+    guide_all_chance, guide_follow_chance,
+    guide_cost_chance, guide_share_chance,
+    interval_time
+  FROM regular_interaction_config 
+  WHERE state = 'normal' 
+  ORDER BY create_date DESC 
+  LIMIT 1`;
+
+  const result = await window.$mapi.db.first(guideSql);
+  console.log('数据库返回的原始interval_time:', result?.interval_time);
+  
+  if (!result) return { content: '', intervalTime: 10000 };
+
+  interface ContentItem {
+    content: string;
+    [key: string]: any;
+  }
+
+  interface ContentGroup {
+    contents: ContentItem[];
+    chance: number;
+  }
+
+  // 解析内容和计算概率
+  const contentGroups: ContentGroup[] = [
+    { 
+      contents: result.guide_all_contents ? JSON.parse(result.guide_all_contents) : [], 
+      chance: result.guide_all_chance || 0 
+    },
+    { 
+      contents: result.guide_follow_contents ? JSON.parse(result.guide_follow_contents) : [], 
+      chance: result.guide_follow_chance || 0 
+    },
+    { 
+      contents: result.guide_cost_contents ? JSON.parse(result.guide_cost_contents) : [], 
+      chance: result.guide_cost_chance || 0 
+    },
+    { 
+      contents: result.guide_share_contents ? JSON.parse(result.guide_share_contents) : [], 
+      chance: result.guide_share_chance || 0 
+    }
+  ];
+
+  // 根据概率选择内容组
+  const totalChance = contentGroups.reduce((sum, group) => sum + group.chance, 0);
+  const calculatedIntervalTime = result.interval_time * 1000;
+  console.log('计算后的intervalTime:', calculatedIntervalTime, 'ms');
+  
+  if (totalChance <= 0) return { content: '', intervalTime: calculatedIntervalTime };
+
+  let randomNum = Math.random() * totalChance;
+  let selectedGroup: ContentGroup | null = null;
+
+  for (const group of contentGroups) {
+    if (randomNum < group.chance) {
+      selectedGroup = group;
+      break;
+    }
+    randomNum -= group.chance;
+  }
+
+  if (selectedGroup?.contents.length) {
+    // 从选中的组中随机选择一条内容
+    const selectedContent = selectedGroup.contents[Math.floor(Math.random() * selectedGroup.contents.length)];
+    return {
+      content: selectedContent?.content || '',
+      intervalTime: calculatedIntervalTime
+    };
+  }
+
+  return { content: '', intervalTime: calculatedIntervalTime };
+};
+
 const sendAutoReply = async (comment: {username: string, id: string}) => {
   if (!webviewRef.value) return;
 
   try {
-    // 首先随机决定使用哪种回复类型（定时引导或产品问答）
-    const useProductQA = Math.random() < 0.5;
-
-    let replyText = '';
-
-    if (useProductQA && props.productQA) {
-      // 从QAndA表获取回复内容
-      const qaSql = `SELECT replys FROM q_and_a 
-        WHERE state = 'normal' 
-        ORDER BY RANDOM() 
-        LIMIT 1`;
-
-      const qaResult = await window.$mapi.db.first(qaSql);
-      
-      if (qaResult && qaResult.replys) {
-        const replies = Array.isArray(qaResult.replys) 
-          ? qaResult.replys 
-          : JSON.parse(qaResult.replys || '[]');
-        
-        if (replies.length > 0) {
-          // 随机选择一条回复
-          replyText = replies[Math.floor(Math.random() * replies.length)];
-        }
+    if (props.welcomeGuide) {
+      const { content } = await getGuideReplyContent();
+      if (content) {
+        console.log('Selected reply:', content);
+        await sendComment(content);
       }
-    }
-
-    // 如果产品问答没有获取到回复，或者随机选择了定时引导，则使用定时引导的内容
-    if (!replyText && props.welcomeGuide) {
-      // 从数据库获取定时引导的内容和概率字段
-      const guideSql = `SELECT 
-        guide_all_contents, guide_follow_contents, 
-        guide_cost_contents, guide_share_contents,
-        guide_all_chance, guide_follow_chance,
-        guide_cost_chance, guide_share_chance
-      FROM regular_interaction_config 
-      WHERE state = 'normal' 
-      ORDER BY create_date DESC 
-      LIMIT 1`;
-
-      const result = await window.$mapi.db.first(guideSql);
-
-      if (result) {
-        interface ContentItem {
-          content: string;
-          [key: string]: any;
-        }
-
-        interface ContentGroup {
-          contents: ContentItem[];
-          chance: number;
-        }
-
-        // 解析内容和计算概率
-        const contentGroups: ContentGroup[] = [
-          { 
-            contents: result.guide_all_contents ? JSON.parse(result.guide_all_contents) : [], 
-            chance: result.guide_all_chance || 0 
-          },
-          { 
-            contents: result.guide_follow_contents ? JSON.parse(result.guide_follow_contents) : [], 
-            chance: result.guide_follow_chance || 0 
-          },
-          { 
-            contents: result.guide_cost_contents ? JSON.parse(result.guide_cost_contents) : [], 
-            chance: result.guide_cost_chance || 0 
-          },
-          { 
-            contents: result.guide_share_contents ? JSON.parse(result.guide_share_contents) : [], 
-            chance: result.guide_share_chance || 0 
-          }
-        ];
-
-        // 根据概率选择内容组
-        const totalChance = contentGroups.reduce((sum, group) => sum + group.chance, 0);
-        if (totalChance > 0) {
-          let randomNum = Math.random() * totalChance;
-          let selectedGroup: ContentGroup | null = null;
-
-          for (const group of contentGroups) {
-            if (randomNum < group.chance) {
-              selectedGroup = group;
-              break;
-            }
-            randomNum -= group.chance;
-          }
-
-          if (selectedGroup && selectedGroup.contents.length > 0) {
-            // 从选中的组中随机选择一条内容
-            const selectedContent = selectedGroup.contents[Math.floor(Math.random() * selectedGroup.contents.length)];
-            if (selectedContent?.content) {
-              replyText = selectedContent.content;
-            }
-          }
-        }
-      }
-    }
-
-    // 如果有回复内容，发送回复
-    if (replyText) {
-      console.log('Selected reply:', replyText);
-      await sendComment(replyText);
     }
   } catch (error) {
     console.error('Auto reply failed:', error);
@@ -730,13 +713,13 @@ defineExpose({
   webviewRef,
 });
 
-// 添加对 welcomeGuide 和 productQA 的监听
-watch([() => props.welcomeGuide, () => props.productQA], ([newWelcomeGuide, newProductQA]) => {
-  // 如果两个功能都关闭，停止自动回复
-  if (!newWelcomeGuide && !newProductQA) {
+// 添加对 welcomeGuide 的监听
+watch(() => props.welcomeGuide, (newWelcomeGuide) => {
+  // 如果功能关闭，停止自动回复
+  if (!newWelcomeGuide) {
     stopAutoReply();
   } else if (!autoReplyInterval.value) {
-    // 如果至少有一个功能开启，且当前没有运行自动回复，则启动
+    // 如果功能开启，且当前没有运行自动回复，则启动
     startAutoReply();
   }
 });
