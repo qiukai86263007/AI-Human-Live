@@ -161,13 +161,23 @@ const addToList = (type: 'manual' | 'ai') => {
 const selectedPlatformDemo = ref('');
 const roomIdDemo = ref('');
 const anchorNameDemo = ref('');
-const rulesDemo = ref({
-  productQA: 0,
-  giftThanks: 0,
-  welcomeGuide: 0,
+
+interface RulesDemo {
+  productQA: boolean;
+  giftThanks: boolean;
+  welcomeGuide: boolean;
+  popularActivity: boolean;
+  smartScript: boolean;
+}
+
+const rulesDemo = ref<RulesDemo>({
+  productQA: false,
+  giftThanks: false,
+  welcomeGuide: false,
   popularActivity: true,
   smartScript: true
 });
+
 // 生成AI内容
 const generateAiContent = () => {
   if (!aiKeyword.value) return;
@@ -1153,35 +1163,80 @@ watch(() => liveRoom.value?.id, async (newId) => {
 
 // 加载规则设置
 const loadRuleSettings = async () => {
-  const liveId = route.query.id as string;
-  if (!liveId) return;
+  const liveId = route.query.id;
+  if (!liveId || typeof liveId !== 'string') {
+    console.log('未找到直播间ID，取消加载规则设置');
+    return;
+  }
 
   try {
     // 加载产品问答配置
     const qaConfig = await QAndAConfigService.getByLiveId(liveId);
-    rulesDemo.value.productQA = qaConfig?.enable ?? 0;
+    console.log('加载产品问答配置:', qaConfig);
+    rulesDemo.value.productQA = Boolean(qaConfig?.enable);
+    
     // 加载礼物感谢配置
     const giftConfig = await GiftThankConfigService.getByLiveId(liveId);
-    rulesDemo.value.giftThanks = giftConfig?.enable ?? 0;
+    rulesDemo.value.giftThanks = Boolean(giftConfig?.enable);
+    
     // 加载定时引导配置
     const regularConfig = await RegularInteractionConfigService.getByLiveId(liveId);
-    rulesDemo.value.welcomeGuide = regularConfig?.enable ?? 0;
+    rulesDemo.value.welcomeGuide = Boolean(regularConfig?.enable);
+    
+    console.log('规则设置加载完成:', {
+      productQA: rulesDemo.value.productQA,
+      giftThanks: rulesDemo.value.giftThanks,
+      welcomeGuide: rulesDemo.value.welcomeGuide
+    });
   } catch (error) {
     console.error('加载规则设置失败:', error);
   }
 };
+
 // 监听规则设置变化
-watch(() => rulesDemo.value.productQA, async (newValue) => {
-  const liveId = route.query.id as string;
-  if (!liveId) return;
+watch(() => rulesDemo.value.productQA, async (newValue: boolean, oldValue: boolean) => {
+  console.log('产品问答状态变化 - 旧值:', oldValue, '新值:', newValue);
+  console.log('当前 rulesDemo 状态:', rulesDemo.value);
+  
+  const liveId = route.query.id;
+  if (!liveId || typeof liveId !== 'string') {
+    console.log('未找到直播间ID，取消更新');
+    return;
+  }
 
   try {
-    const config = await QAndAConfigService.getByLiveId(liveId);
+    let config = await QAndAConfigService.getByLiveId(liveId);
+    console.log('获取到的产品问答配置:', config);
+    
+    const enableValue = newValue ? 1 : 0;
+    console.log('将要设置的 enable 值:', enableValue);
+    
     if (config?.id) {
-      await QAndAConfigService.update(config.id, { enable: newValue });
+      console.log('更新现有配置, ID:', config.id);
+      await QAndAConfigService.update(config.id, { 
+        enable: enableValue,
+        updater: 'current_user'
+      });
+      console.log('产品问答配置已更新');
+    } else {
+      console.log('创建新的产品问答配置');
+      const newConfig = await QAndAConfigService.create({
+        live_id: liveId,
+        enable: enableValue,
+        reply_way: 1,
+        appoint_within_do_not_reply: 60,
+        creator: 'current_user',
+        updater: 'current_user'
+      });
+      console.log('新的产品问答配置已创建:', newConfig);
     }
+    
+    // 确保状态已正确更新
+    console.log('更新后的状态:', newValue);
   } catch (error) {
     console.error('更新产品问答配置失败:', error);
+    // 发生错误时回滚状态
+    rulesDemo.value.productQA = oldValue;
   }
 });
 
@@ -1192,7 +1247,10 @@ watch(() => rulesDemo.value.giftThanks, async (newValue) => {
   try {
     const config = await GiftThankConfigService.getByLiveId(liveId);
     if (config?.id) {
-      await GiftThankConfigService.update(config.id, { enable: newValue });
+      await GiftThankConfigService.update(config.id, { 
+        enable: newValue ? 1 : 0,
+        updater: 'current_user'
+      });
     }
   } catch (error) {
     console.error('更新礼物感谢配置失败:', error);
@@ -1206,7 +1264,10 @@ watch(() => rulesDemo.value.welcomeGuide, async (newValue) => {
   try {
     const config = await RegularInteractionConfigService.getByLiveId(liveId);
     if (config?.id) {
-      await RegularInteractionConfigService.update(config.id, { enable: newValue });
+      await RegularInteractionConfigService.update(config.id, { 
+        enable: newValue ? 1 : 0,
+        updater: 'current_user'
+      });
     }
   } catch (error) {
     console.error('更新定时引导配置失败:', error);
@@ -2133,10 +2194,35 @@ const sceneControlDialogRef = ref<InstanceType<typeof SceneControlDialog> | null
               <div class="mb-6">
                 <div class="text-base mb-4">规则设置</div>
                 <div class="grid grid-cols-2 gap-4">
-                  <a-checkbox v-model="rulesDemo.productQA" :disabled="!canEditAISettings">产品问答</a-checkbox>
-                  <a-checkbox v-model="rulesDemo.giftThanks" :disabled="!canEditAISettings">礼物感谢</a-checkbox>
-                  <a-checkbox v-model="rulesDemo.welcomeGuide" :disabled="!canEditAISettings">定时引导</a-checkbox>
-                  <a-checkbox v-model="rulesDemo.popularActivity" :disabled="!canEditAISettings">人气互动</a-checkbox>
+                  <a-checkbox
+                    :model-value="rulesDemo.productQA"
+                    @update:model-value="(val: boolean | (string | number | boolean)[]) => {
+                      rulesDemo.productQA = Boolean(val);
+                      console.log('产品问答复选框状态更新:', val);
+                    }"
+                    :disabled="!canEditAISettings"
+                  >产品问答</a-checkbox>
+                  <a-checkbox
+                    :model-value="rulesDemo.giftThanks"
+                    @update:model-value="(val: boolean | (string | number | boolean)[]) => {
+                      rulesDemo.giftThanks = Boolean(val);
+                    }"
+                    :disabled="!canEditAISettings"
+                  >礼物感谢</a-checkbox>
+                  <a-checkbox
+                    :model-value="rulesDemo.welcomeGuide"
+                    @update:model-value="(val: boolean | (string | number | boolean)[]) => {
+                      rulesDemo.welcomeGuide = Boolean(val);
+                    }"
+                    :disabled="!canEditAISettings"
+                  >定时引导</a-checkbox>
+                  <a-checkbox
+                    :model-value="rulesDemo.popularActivity"
+                    @update:model-value="(val: boolean | (string | number | boolean)[]) => {
+                      rulesDemo.popularActivity = Boolean(val);
+                    }"
+                    :disabled="!canEditAISettings"
+                  >人气互动</a-checkbox>
                 </div>
                 <div class="mt-2">
                   <a-checkbox v-model="rulesDemo.smartScript" :disabled="!canEditAISettings">
@@ -2246,6 +2332,7 @@ const sceneControlDialogRef = ref<InstanceType<typeof SceneControlDialog> | null
     v-model="showSceneControlDialog" 
     :roomId="roomIdDemo"
     :welcome-guide="rulesDemo.welcomeGuide"
+    :productQA="rulesDemo.productQA"
     @confirm="handleSceneControlConfirm" 
     @onNewComments="handleNewComments"
     @update:visible="(val) => !val && handleSceneControlClose()"

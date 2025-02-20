@@ -344,8 +344,17 @@ const startCollection = () => {
   collectComments();
   collectInterval.value = window.setInterval(collectComments, 1000);
 
-  if (platform.value === 'kuaishou' && props.welcomeGuide) {
+  if (platform.value === 'kuaishou' && (props.welcomeGuide || props.productQA)) {
+    console.log('启动自动回复 - 检查功能状态:');
+    console.log('- 产品问答状态:', props.productQA);
+    console.log('- 定时引导状态:', props.welcomeGuide);
+    console.log('- 平台状态:', platform.value);
     startAutoReply();
+  } else {
+    console.log('未启动自动回复 - 条件不满足:');
+    console.log('- 产品问答状态:', props.productQA);
+    console.log('- 定时引导状态:', props.welcomeGuide);
+    console.log('- 平台状态:', platform.value);
   }
 };
 
@@ -419,37 +428,61 @@ const handleSendComment = async () => {
 };
 
 const startAutoReply = async () => {
-  const autoReply = async () => {
-    const unrepliedComments = comments.value.filter(comment => !repliedComments.has(comment.id));
-    if (unrepliedComments.length > 0) {
-      const commentToReply = unrepliedComments[0];
-      repliedComments.add(commentToReply.id);
+  console.log('准备启动自动回复 - 当前功能状态:');
+  console.log('- 产品问答状态:', props.productQA);
+  console.log('- 定时引导状态:', props.welcomeGuide);
+  console.log('- 平台状态:', platform.value);
 
-      try {
-        await sendAutoReply(commentToReply);
-      } catch (error) {
-        console.error('自动回复失败:', error);
+  if (platform.value === 'kuaishou' && (props.welcomeGuide || props.productQA)) {
+    console.log('满足启动条件，开始启动自动回复');
+    const autoReply = async () => {
+      const unrepliedComments = comments.value.filter(comment => !repliedComments.has(comment.id));
+      if (unrepliedComments.length > 0) {
+        const commentToReply = unrepliedComments[0];
+        repliedComments.add(commentToReply.id);
+
+        try {
+          await sendAutoReply(commentToReply);
+        } catch (error) {
+          console.error('自动回复失败:', error);
+        }
+      }
+    };
+
+    try {
+      // 如果定时引导功能开启，则需要设置时间间隔
+      if (props.welcomeGuide) {
+        const { intervalTime } = await getGuideReplyContent();
+        console.log('设置定时器的间隔时间:', intervalTime, 'ms');
+        
+        // 清除旧的定时器
+        if (autoReplyInterval.value) {
+          clearInterval(autoReplyInterval.value);
+        }
+        
+        // 设置新的定时器，使用从数据库获取的时间间隔
+        autoReplyInterval.value = window.setInterval(autoReply, intervalTime);
+        console.log('定时器已设置，实际间隔:', intervalTime, 'ms');
+      } else {
+        // 如果定时引导功能未开启，则直接执行自动回复，不设置时间间隔
+        // 这样产品问答可以立即响应
+        if (autoReplyInterval.value) {
+          clearInterval(autoReplyInterval.value);
+        }
+        autoReply();
+      }
+    } catch (error) {
+      console.error('启动自动回复失败:', error);
+      // 发生错误时，如果定时引导开启则使用默认间隔
+      if (props.welcomeGuide) {
+        autoReplyInterval.value = window.setInterval(autoReply, 10000);
       }
     }
-  };
-
-  try {
-    // 获取第一次引导内容和时间间隔
-    const { intervalTime } = await getGuideReplyContent();
-    console.log('设置定时器的间隔时间:', intervalTime, 'ms');
-    const lastIntervalTime = autoReplyInterval.value;
-    
-    // 清除旧的定时器
-    if (lastIntervalTime) {
-      clearInterval(lastIntervalTime);
-    }
-    
-    // 设置新的定时器
-    autoReplyInterval.value = window.setInterval(autoReply, intervalTime);
-    console.log('定时器已设置，实际间隔:', intervalTime, 'ms');
-  } catch (error) {
-    console.error('启动自动回复失败:', error);
-    autoReplyInterval.value = window.setInterval(autoReply, 10000); // 发生错误时使用默认间隔
+  } else {
+    console.log('未启动自动回复 - 条件不满足:');
+    console.log('- 产品问答状态:', props.productQA);
+    console.log('- 定时引导状态:', props.welcomeGuide);
+    console.log('- 平台状态:', platform.value);
   }
 };
 
@@ -538,14 +571,89 @@ const getGuideReplyContent = async () => {
   return { content: '', intervalTime: calculatedIntervalTime };
 };
 
-const sendAutoReply = async (comment: {username: string, id: string}) => {
+// 获取产品问答回复内容的内部函数
+const getProductQAReply = async (commentContent: string) => {
+  console.log('开始处理产品问答匹配:', commentContent);
+  
+  try {
+    // 从QA表获取回复内容
+    const qaSql = `SELECT like_problems, replys FROM q_and_a 
+      WHERE state = 'normal'`;
+    
+    const qaResults = await window.$mapi.db.select(qaSql);
+    console.log('获取到QA数据条数:', qaResults?.length);
+
+    for (const qa of qaResults) {
+      const likeProblems = Array.isArray(qa.like_problems) 
+        ? qa.like_problems 
+        : JSON.parse(qa.like_problems || '[]');
+      
+      const replies = Array.isArray(qa.replys) 
+        ? qa.replys 
+        : JSON.parse(qa.replys || '[]');
+
+      console.log('正在匹配问题组:', likeProblems);
+      
+      // 查找匹配的问题
+      const matchIndex = likeProblems.findIndex(problem => 
+        commentContent.includes(problem)
+      );
+
+      if (matchIndex !== -1) {
+        console.log('找到匹配的问题:', likeProblems[matchIndex]);
+        console.log('对应的回复:', replies[matchIndex]);
+        return {
+          content: replies[matchIndex],
+          matched: true,
+          matchedQuestion: likeProblems[matchIndex]
+        };
+      }
+    }
+    
+    console.log('未找到匹配的问题');
+    return {
+      content: '',
+      matched: false,
+      matchedQuestion: ''
+    };
+  } catch (error) {
+    console.error('产品问答匹配失败:', error);
+    return {
+      content: '',
+      matched: false,
+      matchedQuestion: ''
+    };
+  }
+};
+
+const sendAutoReply = async (comment: {username: string, id: string, content: string}) => {
   if (!webviewRef.value) return;
 
+  console.log('准备发送自动回复 - 当前功能状态:');
+  console.log('- 产品问答状态:', props.productQA);
+  console.log('- 定时引导状态:', props.welcomeGuide);
+
   try {
+    // 优先处理产品问答
+    if (props.productQA) {
+      console.log('产品问答功能已开启，开始处理评论:', comment.content);
+      const qaResult = await getProductQAReply(comment.content);
+      
+      if (qaResult.matched) {
+        console.log('产品问答匹配成功，准备发送回复:', qaResult.content);
+        await sendComment(qaResult.content);
+        return;
+      } else {
+        console.log('产品问答未匹配，继续处理定时引导');
+      }
+    }
+
+    // 如果产品问答没有匹配成功，且定时引导开启，则使用定时引导
     if (props.welcomeGuide) {
+      console.log('开始处理定时引导回复');
       const { content } = await getGuideReplyContent();
       if (content) {
-        console.log('Selected reply:', content);
+        console.log('获取到定时引导内容，准备发送:', content);
         await sendComment(content);
       }
     }
@@ -714,12 +822,27 @@ defineExpose({
 });
 
 // 添加对 welcomeGuide 的监听
-watch(() => props.welcomeGuide, (newWelcomeGuide) => {
-  // 如果功能关闭，停止自动回复
-  if (!newWelcomeGuide) {
+watch(() => props.welcomeGuide, (newWelcomeGuide, oldWelcomeGuide) => {
+  console.log('welcomeGuide 属性变化:', oldWelcomeGuide, '->', newWelcomeGuide);
+  // 如果功能关闭，且定时引导和产品问答都未开启，则停止自动回复
+  if (!newWelcomeGuide && !props.productQA) {
     stopAutoReply();
   } else if (!autoReplyInterval.value) {
     // 如果功能开启，且当前没有运行自动回复，则启动
+    startAutoReply();
+  }
+});
+
+// 修改 productQA 的监听
+watch(() => props.productQA, (newProductQA, oldProductQA) => {
+  console.log('SceneControlDialog - productQA 属性变化:', oldProductQA, '->', newProductQA);
+  // 如果功能关闭，且定时引导和产品问答都未开启，则停止自动回复
+  if (!newProductQA && !props.welcomeGuide) {
+    console.log('停止自动回复 - 产品问答和定时引导都已关闭');
+    stopAutoReply();
+  } else if (!autoReplyInterval.value) {
+    // 如果功能开启，且当前没有运行自动回复，则启动
+    console.log('启动自动回复 - 产品问答或定时引导已开启');
     startAutoReply();
   }
 });
