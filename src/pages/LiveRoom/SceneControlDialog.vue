@@ -433,7 +433,7 @@ const startAutoReply = async () => {
   console.log('- 定时引导状态:', props.welcomeGuide);
   console.log('- 平台状态:', platform.value);
 
-  if (platform.value === 'kuaishou' && (props.welcomeGuide || props.productQA)) {
+  if (platform.value === 'kuaishou') {
     console.log('满足启动条件，开始启动自动回复');
     const autoReply = async () => {
       const unrepliedComments = comments.value.filter(comment => !repliedComments.has(comment.id));
@@ -450,26 +450,23 @@ const startAutoReply = async () => {
     };
 
     try {
-      // 如果定时引导功能开启，则需要设置时间间隔
+      // 清除旧的定时器
+      if (autoReplyInterval.value) {
+        clearInterval(autoReplyInterval.value);
+      }
+
+      // 如果产品问答开启，立即开始处理评论
+      if (props.productQA) {
+        console.log('产品问答功能已开启，立即开始处理评论');
+        autoReply();
+      }
+      
+      // 如果定时引导开启，设置定时器
       if (props.welcomeGuide) {
         const { intervalTime } = await getGuideReplyContent();
         console.log('设置定时器的间隔时间:', intervalTime, 'ms');
-        
-        // 清除旧的定时器
-        if (autoReplyInterval.value) {
-          clearInterval(autoReplyInterval.value);
-        }
-        
-        // 设置新的定时器，使用从数据库获取的时间间隔
         autoReplyInterval.value = window.setInterval(autoReply, intervalTime);
         console.log('定时器已设置，实际间隔:', intervalTime, 'ms');
-      } else {
-        // 如果定时引导功能未开启，则直接执行自动回复，不设置时间间隔
-        // 这样产品问答可以立即响应
-        if (autoReplyInterval.value) {
-          clearInterval(autoReplyInterval.value);
-        }
-        autoReply();
       }
     } catch (error) {
       console.error('启动自动回复失败:', error);
@@ -479,10 +476,7 @@ const startAutoReply = async () => {
       }
     }
   } else {
-    console.log('未启动自动回复 - 条件不满足:');
-    console.log('- 产品问答状态:', props.productQA);
-    console.log('- 定时引导状态:', props.welcomeGuide);
-    console.log('- 平台状态:', platform.value);
+    console.log('未启动自动回复 - 平台不是快手');
   }
 };
 
