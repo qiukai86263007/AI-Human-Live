@@ -634,7 +634,7 @@ const sendAutoReply = async (comment: {username: string, id: string, content: st
   console.log('- 定时引导状态:', props.welcomeGuide);
 
   try {
-    // 优先处理产品问答
+    // 如果产品问答功能开启，尝试匹配问答
     if (props.productQA) {
       console.log('产品问答功能已开启，开始处理评论:', comment.content);
       const qaResult = await getProductQAReply(comment.content);
@@ -644,12 +644,12 @@ const sendAutoReply = async (comment: {username: string, id: string, content: st
         await sendComment(qaResult.content);
         return;
       } else {
-        console.log('产品问答未匹配，继续处理定时引导');
+        console.log('产品问答未匹配');
       }
     }
 
-    // 如果产品问答没有匹配成功，且定时引导开启，则使用定时引导
-    if (props.welcomeGuide) {
+    // 只有在产品问答未匹配且定时引导开启时，才使用定时引导
+    if (!props.productQA && props.welcomeGuide) {
       console.log('开始处理定时引导回复');
       const { content } = await getGuideReplyContent();
       if (content) {
