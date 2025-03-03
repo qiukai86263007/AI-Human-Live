@@ -3,6 +3,7 @@ import {TimeUtil} from "../electron/lib/util";
 
 const BASE_URL = 'https://aigcpanel.com';
 const HS_URL =  'https://openspeech.bytedance.com'
+const AI_HUMAN_BACKEND_URL = 'http://60.165.239.28:1880/prod-api'
 
 export const AppConfig = {
     name: 'AI数字人直播系统',
@@ -24,6 +25,10 @@ export const AppConfig = {
     },
     basic: {
         userEnable: false,
+    },
+    aiHuman:{
+        taskSubmit:`${AI_HUMAN_BACKEND_URL}/aihuman/task/anonymous/submit`,
+        taskDownload:`${AI_HUMAN_BACKEND_URL}/aihuman/task/anonymous/download`,
     },
 }
 

@@ -21,6 +21,7 @@ import SpeechAttributeService, { SpeechAttributeRecord } from '../../service/Spe
 import AudioCharacterService, { AudioCharacterRecord } from '../../service/AudioCharacterService';
 import { PathManager } from '../../utils/pathManager';
 import { textToSpeech } from '../../utils/HsTtsUtils';
+import { MusetalkUtils } from '../../utils/MusetalkUtils';
 import SceneControlDialog from './SceneControlDialog.vue';
 import { IconLeft, IconEdit, IconCheck, IconRobot, IconDelete, IconStorage, IconPlus, IconPlayCircle, IconPauseCircle, IconComputer, IconSend, IconImage } from '@arco-design/web-vue/es/icon';
 
@@ -93,7 +94,7 @@ const filteredAnchors = computed(() => {
       return anchor.creator === 'myself';
     }
   });
-  
+
   // 然后根据搜索文本过滤
   if (!searchText.value) return tabFiltered;
   return tabFiltered.filter(anchor =>
@@ -255,10 +256,10 @@ const deleteCategory = async (categoryId: string) => {
   try {
     // 从数据库中删除
     await QAndAService.delete(categoryId);
-    
+
     // 从界面数据中移除
     currentProduct.value.questionCategories = currentProduct.value.questionCategories.filter(c => c.id !== categoryId);
-    
+
     Message.success('删除成功');
   } catch (error) {
     console.error('删除问题种类失败:', error);
@@ -345,7 +346,7 @@ const handleStartLive = async () => {
     const state = liveRoom.value?.state as LiveRoomState;
     const newState: LiveRoomState = state === 'created' ? 'running' : 'created';
     const actionText = newState === 'running' ? '启动' : '停止';
-    
+
     // 如果是要开始直播，显示确认对话框
     if (newState === 'running') {
       Modal.confirm({
@@ -802,7 +803,7 @@ const handleTabChange = (tab: string) => {
   if (tabConfig?.disabled?.value) {
     return;
   }
-  
+
   if (!currentProduct.value) {
     Message.warning('请先选择产品');
     return;
@@ -848,11 +849,6 @@ const isTextPlaying = ref(false);
 const audioTextPlayer = ref<HTMLAudioElement | null>(null);
 // 处理台词试听
 const handlePreviewScript = async (script: ProductScriptRecord, event: Event) => {
-  // 只在开启场控后允许试听
-  if (!showSceneControlDialog.value) {
-    Message.warning('请先开启场控');
-    return;
-  }
 
   if (event) {
     event.stopPropagation();
@@ -1174,15 +1170,15 @@ const loadRuleSettings = async () => {
     const qaConfig = await QAndAConfigService.getByLiveId(liveId);
     console.log('加载产品问答配置:', qaConfig);
     rulesDemo.value.productQA = Boolean(qaConfig?.enable);
-    
+
     // 加载礼物感谢配置
     const giftConfig = await GiftThankConfigService.getByLiveId(liveId);
     rulesDemo.value.giftThanks = Boolean(giftConfig?.enable);
-    
+
     // 加载定时引导配置
     const regularConfig = await RegularInteractionConfigService.getByLiveId(liveId);
     rulesDemo.value.welcomeGuide = Boolean(regularConfig?.enable);
-    
+
     console.log('规则设置加载完成:', {
       productQA: rulesDemo.value.productQA,
       giftThanks: rulesDemo.value.giftThanks,
@@ -1197,7 +1193,7 @@ const loadRuleSettings = async () => {
 watch(() => rulesDemo.value.productQA, async (newValue: boolean, oldValue: boolean) => {
   console.log('产品问答状态变化 - 旧值:', oldValue, '新值:', newValue);
   console.log('当前 rulesDemo 状态:', rulesDemo.value);
-  
+
   const liveId = route.query.id;
   if (!liveId || typeof liveId !== 'string') {
     console.log('未找到直播间ID，取消更新');
@@ -1207,13 +1203,13 @@ watch(() => rulesDemo.value.productQA, async (newValue: boolean, oldValue: boole
   try {
     let config = await QAndAConfigService.getByLiveId(liveId);
     console.log('获取到的产品问答配置:', config);
-    
+
     const enableValue = newValue ? 1 : 0;
     console.log('将要设置的 enable 值:', enableValue);
-    
+
     if (config?.id) {
       console.log('更新现有配置, ID:', config.id);
-      await QAndAConfigService.update(config.id, { 
+      await QAndAConfigService.update(config.id, {
         enable: enableValue,
         updater: 'current_user'
       });
@@ -1230,7 +1226,7 @@ watch(() => rulesDemo.value.productQA, async (newValue: boolean, oldValue: boole
       });
       console.log('新的产品问答配置已创建:', newConfig);
     }
-    
+
     // 确保状态已正确更新
     console.log('更新后的状态:', newValue);
   } catch (error) {
@@ -1247,7 +1243,7 @@ watch(() => rulesDemo.value.giftThanks, async (newValue) => {
   try {
     const config = await GiftThankConfigService.getByLiveId(liveId);
     if (config?.id) {
-      await GiftThankConfigService.update(config.id, { 
+      await GiftThankConfigService.update(config.id, {
         enable: newValue ? 1 : 0,
         updater: 'current_user'
       });
@@ -1264,7 +1260,7 @@ watch(() => rulesDemo.value.welcomeGuide, async (newValue) => {
   try {
     const config = await RegularInteractionConfigService.getByLiveId(liveId);
     if (config?.id) {
-      await RegularInteractionConfigService.update(config.id, { 
+      await RegularInteractionConfigService.update(config.id, {
         enable: newValue ? 1 : 0,
         updater: 'current_user'
       });
@@ -1539,16 +1535,41 @@ const handleStartClone = async () => {
           });
 
         } catch (error) {
-          await window.$mapi.log.error(`产品 ${productName} 的脚本 ${script.id} 渲染失败`);
-          throw new Error(`产品 ${productName} 的脚本 ${script.id} 渲染失败`);
+          await window.$mapi.log.error(`产品 ${productName} 的语音 ${script.id} 克隆失败`);
+          throw new Error(`产品 ${productName} 的语音 ${script.id} 克隆失败`);
         }
       }
     }
 
-    Message.success('脚本渲染完成，开始上传克隆服务器进行克隆...');
-    await window.$mapi.log.info('脚本渲染完成，开始上传克隆服务器进行克隆...');
-    // 调用克隆接口 :TODO
-       
+    Message.success('语音克隆完成，开始上传服务器进行素材渲染...');
+    await window.$mapi.log.info('语音克隆完成，开始上传服务器进行素材渲染...');
+    // 遍历所有产品的脚本，逐个上传音频进行渲染
+    for (const product of products) {
+      const scripts = await ProductScriptService.listByProductId(product.product_id);
+
+      for (const script of scripts) {
+        if (!script.audio_url) continue;
+
+        try {
+          // 准备渲染参数
+          const params = {
+            liveId: liveId,
+            productId: product.product_id,
+            audioFiles: [{
+              scriptId: script.id!,
+              audioPath: script.audio_url!
+            }]
+          };
+          await MusetalkUtils.submitRenderTask(params);
+          // 调用渲染接口
+          await window.$mapi.log.info(`产品 ${product.product_id} 的脚本 ${script.id} 渲染任务已提交`);
+        } catch (error) {
+          await window.$mapi.log.error(`产品 ${product.product_id} 的脚本 ${script.id} 渲染任务提交失败: ${error}`);
+          throw error;
+        }
+      }
+    }
+
     // 更新直播间状态
     await LiveBroadcastService.update(liveId, {
       state: 'created',
@@ -1583,10 +1604,10 @@ const handleAnchorTabChange = (key: string | number) => {
 const filteredQuestionCategories = computed(() => {
   if (!currentProduct.value?.questionCategories) return [];
   if (!questionSearchText.value) return currentProduct.value.questionCategories;
-  
+
   return currentProduct.value.questionCategories.map(category => ({
     ...category,
-    qas: category.qas.filter(qa => 
+    qas: category.qas.filter(qa =>
       qa.question.toLowerCase().includes(questionSearchText.value.toLowerCase()) ||
       qa.answer.toLowerCase().includes(questionSearchText.value.toLowerCase())
     )
@@ -1603,7 +1624,7 @@ const handleNewComments = (newComments: Array<{username: string, content: string
     publicScreenComments.value = [];
     return;
   }
-  
+
   publicScreenComments.value.push(...newComments);
   // 保持最新的 50 条弹幕
   if (publicScreenComments.value.length > 50) {
@@ -1749,15 +1770,15 @@ const sceneControlDialogRef = ref<InstanceType<typeof SceneControlDialog> | null
           </template>
         </div>
         <div class="p-4">
-          <a-button type="primary" class="w-full mb-2" status="primary" 
-            :disabled="shouldDisableFeatures" 
+          <a-button type="primary" class="w-full mb-2" status="primary"
+            :disabled="shouldDisableFeatures"
             @click="handleCreateProduct">
             <template #icon>
               <IconPlus />
             </template>
             新建产品
           </a-button>
-          <a-button type="primary" class="w-full" 
+          <a-button type="primary" class="w-full"
             :disabled="shouldDisableFeatures"
             @click="handleStartClone">
             <template #icon>
@@ -1770,14 +1791,14 @@ const sceneControlDialogRef = ref<InstanceType<typeof SceneControlDialog> | null
 
       <!-- 左侧导航栏 -->
       <div class="w-20 flex-shrink-0 border-r border-gray-800">
-        <div v-for="tab in tabs" :key="tab.key" 
-          class="py-4 px-2 cursor-pointer flex flex-col items-center" 
+        <div v-for="tab in tabs" :key="tab.key"
+          class="py-4 px-2 cursor-pointer flex flex-col items-center"
           :class="{
             'bg-blue-500/10 text-blue-500': currentTab === tab.key,
             'text-gray-400': currentTab !== tab.key,
             'cursor-not-allowed opacity-50': tab.disabled?.value,
             'cursor-not-allowed': !currentProduct
-          }" 
+          }"
           @click="handleTabChange(tab.key)">
           <i :class="tab.icon" class="text-xl mb-1"></i>
           <span class="text-xs">{{ tab.key }}</span>
@@ -1804,8 +1825,8 @@ const sceneControlDialogRef = ref<InstanceType<typeof SceneControlDialog> | null
             </div>
           </div>
           <div class="mt-4 flex justify-center">
-            <a-button type="outline" 
-              :disabled="!currentProduct || !selectedAnchor || shouldDisableFeatures" 
+            <a-button type="outline"
+              :disabled="!currentProduct || !selectedAnchor || shouldDisableFeatures"
               @click="saveCurrentSettings">
               保存当前设置
             </a-button>
@@ -2189,7 +2210,7 @@ const sceneControlDialogRef = ref<InstanceType<typeof SceneControlDialog> | null
                   <a-input class="flex-1" v-model="anchorNameDemo" :disabled="!canEditAISettings" placeholder="请输入主播名称" />
                 </div>
               </div>
-              
+
               <!-- 规则设置 -->
               <div class="mb-6">
                 <div class="text-base mb-4">规则设置</div>
@@ -2258,15 +2279,15 @@ const sceneControlDialogRef = ref<InstanceType<typeof SceneControlDialog> | null
 
               <!-- 底部按钮 -->
               <div class="flex gap-4 justify-center">
-                <a-input 
-                  class="flex-1" 
+                <a-input
+                  class="flex-1"
                   v-model="commentText"
-                  placeholder="请输入消息内容" 
+                  placeholder="请输入消息内容"
                   :maxLength="40"
                   @keyup.enter="sendComment"
                 />
-                <a-button 
-                  type="primary" 
+                <a-button
+                  type="primary"
                   @click="sendComment"
                 >
                   <template #icon>
@@ -2327,13 +2348,13 @@ const sceneControlDialogRef = ref<InstanceType<typeof SceneControlDialog> | null
   </a-modal>
 
   <!-- 场控设置弹窗 -->
-  <SceneControlDialog 
+  <SceneControlDialog
     ref="sceneControlDialogRef"
-    v-model="showSceneControlDialog" 
+    v-model="showSceneControlDialog"
     :roomId="roomIdDemo"
     :welcome-guide="rulesDemo.welcomeGuide"
     :productQA="rulesDemo.productQA"
-    @confirm="handleSceneControlConfirm" 
+    @confirm="handleSceneControlConfirm"
     @onNewComments="handleNewComments"
     @update:visible="(val) => !val && handleSceneControlClose()"
   />
