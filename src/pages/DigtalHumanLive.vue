@@ -6,7 +6,7 @@ import LiveBroadcastService, { LiveBroadcastRecord } from '../service/LiveBroadc
 import LiveProductService from '../service/LiveProductService';
 import ProductSceneService from '../service/ProductSceneService';
 import { useRouter } from 'vue-router';
-
+import { LiveRoomState } from '../types/liveRoomState';
 const router = useRouter();
 const createDialog = ref();
 const liveRooms = ref<LiveBroadcastRecord[]>([]);
@@ -17,9 +17,10 @@ const dateRange = ref([]);
 
 const typeOptions = [
   { label: '全部', value: '全部' },
-  { label: '编辑中', value: 'editing' },
-  { label: '待开播', value: 'created' },
-  { label: '直播中', value: 'live' },
+  { label: '生成视频中', value: LiveRoomState.CREATING },
+  { label: '编辑中', value: LiveRoomState.EDITING },
+  { label: '待开播', value: LiveRoomState.CREATED },
+  { label: '直播中', value: LiveRoomState.LIVE },
 ];
 
 // 加载直播间列表
@@ -98,12 +99,14 @@ const handleCreate = () => {
 
 const getStateColor = (state?: string) => {
   switch (state) {
-    case 'editing':
+    case LiveRoomState.EDITING:
       return 'blue';
-    case 'created':
+    case LiveRoomState.CREATED:
       return 'orange';
-    case 'live':
+    case LiveRoomState.LIVE:
       return 'green';
+      case LiveRoomState.CREATING:
+      return 'blue';
     default:
       return 'gray';
   }
@@ -111,12 +114,14 @@ const getStateColor = (state?: string) => {
 
 const getStateText = (state?: string) => {
   switch (state) {
-    case 'editing':
+    case LiveRoomState.EDITING:
       return '编辑中';
-    case 'created':
+    case LiveRoomState.CREATED:
       return '待开播';
-    case 'live':
+    case LiveRoomState.LIVE:
       return '直播中';
+    case LiveRoomState.CREATING:
+      return '渲染中';
     default:
       return '未知状态';
   }

@@ -1,11 +1,12 @@
 import { v4 as uuidv4 } from 'uuid';
 import { TimeUtil } from "../lib/util";
+import { LiveRoomState } from '../types/liveRoomState';
 
 export type LiveBroadcastRecord = {
     id?: string;
     live_name: string;
     live_introduction: string;
-    state?: 'editing' | 'created' | 'running';
+    state?: LiveRoomState;
     create_date?: string;
     creator: string;
     updater: string;
@@ -46,7 +47,7 @@ export const LiveBroadcastService = {
     async create(record: LiveBroadcastRecord) {
         const now = TimeUtil.timestampMS()
         record.id = uuidv4()
-        record.state = 'editing'
+        record.state = LiveRoomState.EDITING
         record.create_date = new Date(now).toISOString()
         record.update_date = new Date(now).toISOString()
 
@@ -90,7 +91,7 @@ export const LiveBroadcastService = {
     async start(record: LiveBroadcastRecord) {
         if (!record.id) throw new Error('Record ID is required');
         await this.update(record.id, {
-            state: 'running'
+            state: LiveRoomState.RUNNING
         })
     },
 
@@ -98,7 +99,7 @@ export const LiveBroadcastService = {
     async stop(record: LiveBroadcastRecord) {
         if (!record.id) throw new Error('Record ID is required');
         await this.update(record.id, {
-            state: 'stopped'
+            state: LiveRoomState.STOPPED
         })
     }
 }

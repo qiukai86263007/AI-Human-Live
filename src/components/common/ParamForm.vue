@@ -53,6 +53,7 @@ const setValue = (value) => {
     formData.value.forEach((item) => {
         item.value = value[item.name] || item.defaultValue
     })
+    console.log('setValue',formData.value)
 }
 
 defineExpose({

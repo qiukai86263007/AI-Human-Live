@@ -29,6 +29,7 @@ export const AppConfig = {
     aiHuman:{
         taskSubmit:`${AI_HUMAN_BACKEND_URL}/aihuman/task/anonymous/submit`,
         taskDownload:`${AI_HUMAN_BACKEND_URL}/aihuman/task/anonymous/download`,
+        taskStatus:`${AI_HUMAN_BACKEND_URL}/aihuman/task/anonymous/status`,
     },
 }
 

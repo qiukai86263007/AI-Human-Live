@@ -52,47 +52,49 @@ watch(() => formData.value.serverKey, async (value) => {
 })
 
 const doSubmit = async () => {
-    formData.value.param = paramForm.value?.getValue() || {}
-    if (!formData.value.serverKey) {
-        Dialog.tipError(t('请选择模型'))
-        return
-    }
-    if (!formData.value.promptName) {
-        Dialog.tipError(t('请选择声音角色'))
-        return
-    }
-    const prompt = await soundClonePromptStore.getByName(formData.value.promptName)
-    if (!prompt) {
-        Dialog.tipError(t('声音角色不存在'))
-        return
-    }
-    if (!formData.value.text) {
-        Dialog.tipError(t('请输入合成内容'))
-        return
-    }
-    const server = await serverStore.getByKey(formData.value.serverKey)
-    if (!server) {
-        Dialog.tipError(t('模型不存在'))
-        return
-    }
-    if (server.status !== EnumServerStatus.RUNNING) {
-        Dialog.tipError(t('模型未启动'))
-        return
-    }
-    const record: SoundCloneRecord = {
-        serverName: server.name,
-        serverTitle: server.title,
-        serverVersion: server.version,
-        promptName: prompt.name,
-        promptWav: prompt.promptWav,
-        promptText: prompt.promptText,
-        text: formData.value.text,
-        param: formData.value.param,
-    }
-    const id = await SoundCloneService.submit(record)
-    formData.value.text = ''
-    Dialog.tipSuccess(t('任务已经提交成功，等待克隆完成'))
-    emit('submitted')
+    console.log('doSubmit没有执行！')
+    // formData.value.param = paramForm.value?.getValue() || {}
+    // if (!formData.value.serverKey) {
+    //     Dialog.tipError(t('请选择模型'))
+    //     return
+    // }
+    // if (!formData.value.promptName) {
+    //     Dialog.tipError(t('请选择声音角色'))
+    //     return
+    // }
+    // const prompt = await soundClonePromptStore.getByName(formData.value.promptName)
+    // if (!prompt) {
+    //     Dialog.tipError(t('声音角色不存在'))
+    //     return
+    // }
+    // if (!formData.value.text) {
+    //     Dialog.tipError(t('请输入合成内容'))
+    //     return
+    // }
+    // const server = await serverStore.getByKey(formData.value.serverKey)
+    // if (!server) {
+    //     Dialog.tipError(t('模型不存在'))
+    //     return
+    // }
+    // if (server.status !== EnumServerStatus.RUNNING) {
+    //     Dialog.tipError(t('模型未启动'))
+    //     return
+    // }
+    // const record: SoundCloneRecord = {
+    //     serverName: server.name,
+    //     serverTitle: server.title,
+    //     serverVersion: server.version,
+    //     promptName: prompt.name,
+    //     promptWav: prompt.promptWav,
+    //     promptText: prompt.promptText,
+    //     text: formData.value.text,
+    //     param: formData.value.param,
+    // }
+    // console.log('SoundCloneService.submit', record)
+    // const id = await SoundCloneService.submit(record)
+    // formData.value.text = ''
+    // Dialog.tipSuccess(t('任务已经提交成功，等待克隆完成'))
+    // emit('submitted')
 }
 
 const emit = defineEmits({

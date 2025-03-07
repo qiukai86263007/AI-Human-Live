@@ -82,7 +82,8 @@ export async function textToSpeech(
     }
 
     const result = await response.json();
-    await window.$mapi.log.info('请求语音合成接口成功，返回结果:' + JSON.stringify(result));
+    let r = JSON.stringify(result)
+    await window.$mapi.log.info('请求语音合成接口成功，返回结果:' + r.slice(0,20)+'.......'+r.slice(-50));
 
     if (result.data) {
       // 将base64字符串转换为Buffer
