@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { Message, Modal } from '@arco-design/web-vue';
 import CreateLiveRoomDialog from '../components/Live/CreateLiveRoomDialog.vue';
 import LiveBroadcastService, { LiveBroadcastRecord } from '../service/LiveBroadcastService';
@@ -7,6 +7,26 @@ import LiveProductService from '../service/LiveProductService';
 import ProductSceneService from '../service/ProductSceneService';
 import { useRouter } from 'vue-router';
 import { LiveRoomState } from '../types/liveRoomState';
+
+import { useMyStore } from '../store/modules/myStore';
+import { getStatus } from '../utils/VoiceCloneUtils';
+import { get } from 'lodash-es';
+import { mock } from 'node:test';
+
+interface MockQueryResponse {
+  msg: string;
+  code: number;
+  data: {
+    pending_count: number;
+    processing_count: number;
+    total_count: number;
+    failed_count: number;
+    completed_count: number;
+  };
+}
+
+const store = useMyStore();
+
 const router = useRouter();
 const createDialog = ref();
 const liveRooms = ref<LiveBroadcastRecord[]>([]);
@@ -27,6 +47,13 @@ const typeOptions = [
 const loadLiveRooms = async () => {
   try {
     liveRooms.value = await LiveBroadcastService.list();
+    store.livesList = liveRooms.value.map(i=>{
+      return {
+        id: i.id,
+        state: i.state
+      }
+    }) as any;
+    console.log('store.livesList',store.livesList)
     // 加载每个直播间的预览图
     for (const room of liveRooms.value) {
       if (!room.id) continue;
@@ -87,6 +114,79 @@ const resetFilters = () => {
   selectedType.value = '全部';
   dateRange.value = [];
 };
+
+/*用于下载*/
+let gettingList:any[] = [];
+let isQuerying = false;
+watch(()=>store.livesList,  // 每次onMounted 都会触发一次 提交下载请求也会更新store(TODO)
+  async (new1,old) => {
+    // console.log('livesList changed',new1,old);
+    let a = new1.filter(item=>item.state == LiveRoomState.CREATING)
+    let b;
+    if(old){
+      b = old.filter(item=>item.state == LiveRoomState.CREATING)
+      for(let i=0;i<a.length;i++){
+        if(b.includes(a[i])) continue;
+        gettingList.push(a[i]);
+      }
+    }else{
+      gettingList = a;
+    }
+    // console.log('gettingList',gettingList);
+    queryIsDownloadable(gettingList); // 轮询可下载状态
+  }
+)
+const queryIsDownloadable = async (list) => {
+  if(isQuerying) return;
+  // 如果正在寻找 那么增加 否则新建
+  if(list.length){
+    isQuerying = true;
+    const promises = list.map(i=>{
+      // loopQuery(i.id)  // 请求状态  注意 后端提供的格式是 ../state/123  而不是  ../state?parentTaskId=123
+      return mockQuery().then(r=>r.data)
+      .then(d=>{
+        if(d.completed_count==d.total_count){
+          sendDownloadRequest(i.id);
+          gettingList = gettingList.filter(item => item.id !== i.id);
+        }
+      })
+      .catch(e=>{
+        console.error(`查询直播间 ${i.id} 状态失败:`, e)
+      })
+    })
+
+    await Promise.all(promises)
+    isQuerying = false;
+    if (gettingList.length) {
+      queryIsDownloadable(gettingList);
+    }
+  }
+}
+const mockQuery = async ():Promise<MockQueryResponse> => new Promise((resolve,reject)=>{
+  setTimeout(()=>{
+    let a :MockQueryResponse = {
+      'msg':'操作成功',
+      'code':200,
+      'data':{
+        'pending_count':19,
+        'processing_count':1,
+        'total_count':20,
+        'failed_count':0,
+        'completed_count':20
+      }
+    }
+    resolve(a)
+  },100)
+})
+
+const loopQuery = async () => {
+  // 模拟fetch
+
+}
+const sendDownloadRequest = (id)=>{
+  console.log('sendDownloadRequest-id:',id)
+}
+
 
 // 组件挂载时加载数据
 onMounted(() => {
@@ -249,8 +349,8 @@ const handleDelete = async (room: LiveBroadcastRecord, event: Event) => {
               <div class="text-white font-medium text-lg mb-3">{{ room.live_name }}</div>
               <div class="text-gray-100 text-sm line-clamp-2 mb-4">{{ room.live_introduction }}</div>
               <div class="flex justify-between items-center">
-                <a-tag :color="getStateColor(room.state)" size="small">
-                  {{ getStateText(room.state) }}
+                <a-tag :color="getStateColor(store.livesList.find(i=>i.id === room.id).state)" size="small">
+                  {{ getStateText(store.livesList.find(i=>i.id === room.id).state) }}
                 </a-tag>
                 <span class="text-sm text-gray-200">
                   {{ room.create_date ? new Date(room.create_date).toLocaleDateString() : '' }}

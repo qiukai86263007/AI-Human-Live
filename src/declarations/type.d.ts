@@ -117,6 +117,7 @@ declare interface Window {
             exists: (path: string, option?: { isFullPath?: boolean, }) => Promise<boolean>,
             isDirectory: (path: string, option?: { isFullPath?: boolean, }) => Promise<boolean>,
             mkdir: (path: string, option?: { isFullPath?: boolean, }) => Promise<void>,
+            download: (url: string, path: string, option?: { isFullPath?: boolean, progress?:any}) => Promise<any>,
             zipFolder: (path: string, option?: { isFullPath?: boolean, }) => Promise<void>,
             list: (path: string, option?: { isFullPath?: boolean, }) => Promise<any[]>,
             listAll: (path: string, option?: { isFullPath?: boolean, }) => Promise<any[]>,

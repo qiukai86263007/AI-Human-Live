@@ -1,21 +1,23 @@
 /*
  * @Author: error: error: git config user.name & please set dead value or install git && error: git config user.email & please set dead value or install git & please set dead value or install git
  * @Date: 2025-03-03 17:32:38
- * @LastEditors: error: error: git config user.name & please set dead value or install git && error: git config user.email & please set dead value or install git & please set dead value or install git
- * @LastEditTime: 2025-03-05 17:51:21
+ * @LastEditors: zhjiajia 46287134@qq.com
+ * @LastEditTime: 2025-03-11 15:08:21
  * @FilePath: \workRome\AI-Human-Live\src\utils\MusetalkUtils.ts
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
-import { PathManager } from './pathManager';
-import { AppConfig } from '../config';
+import { PathManager } from "./pathManager";
+import { AppConfig } from "../config";
+import { reject } from "lodash-es";
+import { Message } from "@arco-design/web-vue";
 
 interface RenderParams {
-    clientId:string;
-          userId:string;
-          parentTaskId: string,
-          imageIdList: Array<string>,
-          audioIdList: Array<string>,
-          file: string;
+    clientId: string;
+    userId: string;
+    parentTaskId: string;
+    imageIdList: Array<string>;
+    audioIdList: Array<string>;
+    file: string;
 }
 export class MusetalkUtils {
     /**
@@ -24,25 +26,29 @@ export class MusetalkUtils {
      * @returns Promise<void>
      */
     static async submitRenderTask(params: RenderParams): Promise<void> {
-        console.log('到submitRenderTask了')
-        try {
-            let formData = new FormData();
-            console.log(params)
-            for (let key in params) {
-                if (key != 'file') {
-                    formData.append(key, params[key]);
-                }else if(key == 'file'){
-                    let buffer = await window.$mapi.file.readBuffer(params.file, { isFullPath: true });
-                    let blob = new Blob([buffer],{type:'application/zip'})
-                    formData.append(key,blob)
-                }
+        console.log("到submitRenderTask了");
+
+        let formData = new FormData();
+        console.log(params);
+        for (let key in params) {
+            if (key != "file") {
+                formData.append(key, params[key]);
+            } else if (key == "file") {
+                let buffer = await window.$mapi.file.readBuffer(params.file, {
+                    isFullPath: true,
+                });
+                let blob = new Blob([buffer], { type: "application/zip" });
+                formData.append(key, blob, `${params.parentTaskId}.zip`); // 后端逻辑通过.zip文件名称判断
             }
-            let consoleForm = ()=>{
-                console.log('----formData----')
-                let formObject = {};
-                formData.forEach((value, key) => { formObject[key] = value; });
-                console.log(formObject);
-                /*
+        }
+        let consoleForm = () => {
+            console.log("----formData----");
+            let formObject = {};
+            formData.forEach((value, key) => {
+                formObject[key] = value;
+            });
+            console.log(formObject);
+            /*
                     {
                         "clientId": "",
                         "userId": "",
@@ -51,55 +57,88 @@ export class MusetalkUtils {
                         "audioIdList": "b71f0c57-2079-45f8-b39c-3d6dd814aab5,91a5559d-0605-4bc9-be23-6928b0548394,22417e16-9163-478a-bd65-9f5b3eec2588,b17b2bd3-7972-4456-93ff-4cd39e92c9dd",
                         "file":File类型 {
                             size:112312,
-                            name,
+                            name：'blob',
                             type:"application/zip"
                         }
                     }
                 */
-            }
-            consoleForm()
-            let send = async ()=>{
-                const renderTaskResponse = await fetch(AppConfig.aiHuman.taskSubmit, {
-                    method: 'POST',
-                    body: formData  // 使用 FormData 替代 JSON
+        };
+        consoleForm();
+        let send = async () => {
+            fetch(AppConfig.aiHuman.taskSubmit, {
+                method: "POST",
+                body: formData, // 使用 FormData 替代 JSON
+            })
+                .then(async (res) => {
+                    let d = await res.json();
+                    console.log("submitRenderTask:", d);
+                    // 如果成功 显示成功 打印成功
+                    if (res.ok) {
+                        // response.ok在200~299
+                        /*
+                            {
+                                "msg": "全部提交成功",
+                                "code": 200
+                            }
+                        */
+                        Message.success(d.msg);
+                        window.$mapi.log.info(
+                            "submitRenderTask:" + d.msg + d.code
+                        );
+                    } else {
+                        Message.error(d.msg);
+                        window.$mapi.log.error(
+                            "submitRenderTask:" + d.msg + d.code
+                        );
+                    }
+                })
+                .catch((rej) => {
+                    console.error("Network error:", rej);
+                    Message.error("Network error:", rej);
+                    window.$mapi.log.error(
+                        "submitRenderTask Network error:" + rej
+                    );
                 });
-            }
-            // send();
-            // 请求无误，payload为一个formData对象 200发出 等待接口编写 
-
-            // if (!renderTaskResponse.ok) {
-            //     throw new Error('渲染任务提交失败');
-            // }
-
-            // await window.$mapi.log.info('渲染任务提交成功', {
-            //     a:'hello'
-            // });
-
-        } catch (error) {
-            await window.$mapi.log.error('渲染任务提交失败:', error);
-            throw error;
-        }
+        };
+        send();
+        // 后续可能 根据失败原因处理重新克隆策略
     }
-    static async getTaskStatus(taskId: string): Promise<boolean> {
-        const response = await fetch(`${AppConfig.aiHuman.taskStatus}?taskId=${taskId}`, {
-            method: 'GET',
-        });
-        const data = await response.json();
-        console.log('data',data)
-        return data
-    }
-    static async getRenderedViews(taskId: string): Promise<boolean> {
+    static downloadVideo = async () => {
+        const url = 'https://tse2-mm.cn.bing.net/th/id/OIP-C.7GLMYPqMlt2LgkbPsOnDIAAAAA?rs=1&pid=ImgDetMain';
+        const localPath = 'downloads/downloaded_image.jpg';
+    
+        await window.$mapi.file.download(url, localPath, { progress: null });
+    };
+    // 当status为allFinished  开始下载  我会拿到一个压缩包 里面是一个viedos文件夹 名称和音频一一对应
+    static async getRenderedViews(taskId: string): Promise<void> {
         // mapi/file 里面有download
-            const response = await fetch(`${AppConfig.aiHuman.taskDownload}?taskId=${taskId}`, {
-                method: 'GET',
-            });
-
-            if (!response.ok) {
-                throw new Error('获取渲染任务状态失败');
+        fetch(
+            `${AppConfig.aiHuman.taskDownload}?taskId=${taskId}`,
+            {
+                method: "GET",
             }
-
-            const data = await response.json();
-            console.log('data',data)
-            return data.status === 'done';
+        )
+        .then(async res=>{
+            let d = await res.json();
+            if(res.ok){
+                // 逐个的进行downloadVideo
+            }else{
+                Message.error(d.msg);
+                window.$mapi.log.error(
+                    "getRenderedViews:" + d.msg + d.code
+                );
+            }
+        })
+    }
+    static async getTaskStatus(taskId: string): Promise<any> {
+        return fetch(
+            `${AppConfig.aiHuman.taskStatus}/${taskId}`,    // 接口是这样 而非query
+            {
+                method: "GET",
+            }
+        ).then(async res => await res.json() )
+        .catch((rej) => {
+            console.error("Network error:", rej);
+        });
     }
 }

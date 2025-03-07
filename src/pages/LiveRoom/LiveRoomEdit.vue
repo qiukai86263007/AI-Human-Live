@@ -24,6 +24,11 @@ import { textToSpeech } from '../../utils/HsTtsUtils';
 import { MusetalkUtils } from '../../utils/MusetalkUtils';
 import SceneControlDialog from './SceneControlDialog.vue';
 import { IconLeft, IconEdit, IconCheck, IconRobot, IconDelete, IconStorage, IconPlus, IconPlayCircle, IconPauseCircle, IconComputer, IconSend, IconImage } from '@arco-design/web-vue/es/icon';
+// 为了测试AppEnv的东西
+import { AppEnv, waitAppEnvReady } from "../../../electron/mapi/env";
+import path from "node:path";
+import { LiveRoomState } from '../../types/liveRoomState';
+import { StorageUtil } from '../../lib/storage';
 
 const router = useRouter();
 const route = useRoute();
@@ -59,13 +64,10 @@ const showEditScriptDialog = ref(false);
 const qaConfig = ref<QAndAConfigRecord | null>(null);
 const showSceneControlDialog = ref(false);
 
-// 修改直播间状态类型
-type LiveRoomState = 'editing' | 'created' | 'running' | 'live';
-
 // 添加计算属性判断是否应该禁用功能
 const shouldDisableFeatures = computed(() => {
   const state = liveRoom.value?.state as LiveRoomState;
-  return state === 'created' || state === 'running';
+  return state === LiveRoomState.CREATED || state === LiveRoomState.RUNNING;
 });
 
 // 修改tabs定义
@@ -323,16 +325,16 @@ const deleteQA = async (categoryId: string, qaId: string) => {
 // 添加计算属性判断是否显示开始直播按钮
 const showStartLiveButton = computed(() => {
   const state = liveRoom.value?.state as LiveRoomState;
-  return state === 'created' || state === 'running';
+  return state === LiveRoomState.CREATED || state === LiveRoomState.RUNNING;
 });
 
 const isLiveButtonText = computed(() => {
   const state = liveRoom.value?.state as LiveRoomState;
-  return state === 'created' ? '开始直播' : '停止直播';
+  return state === LiveRoomState.CREATED ? '开始直播' : '停止直播';
 });
 
 const canEditAISettings = computed(() => {
-  return liveRoom.value?.state === 'created';
+  return liveRoom.value?.state === LiveRoomState.CREATED;
 });
 // 添加开始直播方法
 const handleStartLive = async () => {
@@ -344,11 +346,11 @@ const handleStartLive = async () => {
 
   try {
     const state = liveRoom.value?.state as LiveRoomState;
-    const newState: LiveRoomState = state === 'created' ? 'running' : 'created';
-    const actionText = newState === 'running' ? '启动' : '停止';
+    const newState: LiveRoomState = state === LiveRoomState.CREATED ? LiveRoomState.RUNNING : LiveRoomState.CREATED;
+    const actionText = newState === LiveRoomState.RUNNING ? '启动' : '停止';
 
     // 如果是要开始直播，显示确认对话框
-    if (newState === 'running') {
+    if (newState === LiveRoomState.RUNNING) {
       Modal.confirm({
         title: '开启场控',
         content: '是否同时开启场控？',
@@ -375,7 +377,7 @@ const handleStartLive = async () => {
 const updateLiveState = async (newState: LiveRoomState) => {
   const liveId = route.query.id as string;
   try {
-    Message.loading(`正在${newState === 'running' ? '启动' : '停止'}直播...`);
+    Message.loading(`正在${newState === LiveRoomState.RUNNING ? '启动' : '停止'}直播...`);
     await LiveBroadcastService.update(liveId, {
       state: newState,
       update_date: new Date().toISOString(),
@@ -383,7 +385,7 @@ const updateLiveState = async (newState: LiveRoomState) => {
     });
 
     await loadLiveRoom();
-    Message.success(`直播已${newState === 'running' ? '启动' : '停止'}`);
+    Message.success(`直播已${newState === LiveRoomState.RUNNING ? '启动' : '停止'}`);
   } catch (error) {
     console.error('更新直播状态失败:', error);
     Message.error('更新直播状态失败');
@@ -397,7 +399,7 @@ const handleSceneControlConfirm = async (settings: any) => {
     console.log('Scene control settings:', settings);
     Message.success('场控设置已保存');
     // 更新直播状态为运行中
-    await updateLiveState('running');
+    await updateLiveState(LiveRoomState.RUNNING);
   } catch (error) {
     console.error('保存场控设置失败:', error);
     Message.error('保存场控设置失败');
@@ -1459,127 +1461,162 @@ watch(() => currentProduct.value?.id, async (newId) => {
 
 // 开始克隆
 const handleStartClone = async () => {
-  const liveId = route.query.id as string;
-  if (!liveId) {
-    Message.warning('直播间ID未设置');
-    return;
-  }
-
+  let products;
+  let checkNecessary, getAudio, createRenderTask;
+  let liveId = route.query.id as string;
   try {
-    Message.loading('正在生成台词音频...');
-    await window.$mapi.log.info("正在生成台词音频...");
 
-    // 获取所有产品
-    const products = await LiveProductService.listByLiveId(liveId);
+    checkNecessary = () => {
+      if (!liveId) {
+        Message.warning('直播间ID未设置');
+        return;
+      }
+    }
+    checkNecessary();
 
-    // 获取语音配置
-    for (const product of products) {
-      // 获取产品的语音配置
-      const voiceConfig = await window.$mapi.db.first(
-        `SELECT * FROM speech_attribute
+    products = await LiveProductService.listByLiveId(liveId);
+    getAudio = async () => {
+      Message.loading('正在生成台词音频...');
+      await window.$mapi.log.info("正在生成台词音频...");
+      for (const product of products) {
+        // 获取产品的语音配置
+        const voiceConfig = await window.$mapi.db.first(
+          `SELECT * FROM speech_attribute
          WHERE live_id = ?
          AND product_id = ?
          AND type = 'voice'
          AND state = 'normal'
          ORDER BY create_date DESC
          LIMIT 1`,
-        [liveId, product.product_id]
-      );
-      await window.$mapi.log.info("product.product_id: ", product.product_id);
-      await window.$mapi.log.info("liveId: ", liveId);
-      const productDetail = await ProductService.get(product.product_id);
-      const productName = productDetail?.product_name;
+          [liveId, product.product_id]
+        );
+        await window.$mapi.log.info("product.product_id: ", product.product_id);
+        await window.$mapi.log.info("liveId: ", liveId);
+        const productDetail = await ProductService.get(product.product_id);
+        const productName = productDetail?.product_name;
 
-      if (!voiceConfig) {
-        Message.warning(`产品 ${productName} 未配置语音，请先配置语音`);
-        throw new Error(`产品 ${productName} 未配置语音，请先配置语音`);
-      }
+        if (!voiceConfig) {
+          Message.warning(`产品 ${productName} 未配置语音，请先配置语音`);
+          throw new Error(`产品 ${productName} 未配置语音，请先配置语音`);
+        }
 
-      // 解析语音配置
-      const voiceInfo = JSON.parse(voiceConfig.content);
+        // 解析语音配置
+        const voiceInfo = JSON.parse(voiceConfig.content);
 
-      // 获取语音角色信息
-      const voiceCharacter = await AudioCharacterService.get(voiceInfo.voicer_id);
-      if (!voiceCharacter) {
-        Message.warning(`产品 ${productName} 的语音配置无效`);
-        throw new Error(`产品 ${productName} 的语音配置无效`);
-      }
+        // 获取语音角色信息
+        const voiceCharacter = await AudioCharacterService.get(voiceInfo.voicer_id);
+        if (!voiceCharacter) {
+          Message.warning(`产品 ${productName} 的语音配置无效`);
+          throw new Error(`产品 ${productName} 的语音配置无效`);
+        }
 
-      // 获取产品的所有脚本
-      const scripts = await ProductScriptService.listByProductId(product.product_id);
-      console.log('scripts: ' + scripts);
-      // 渲染每个脚本
-      for (const script of scripts) {
-        try {
-          // 调用TTS接口渲染音频
-          const buffer = await textToSpeech(
-            voiceCharacter.app_key || '',
-            voiceCharacter.access_key_secret || '',
-            script.text_content,
-            voiceCharacter.voice_id || ''
-          );
+        // 获取产品的所有脚本
+        const scripts = await ProductScriptService.listByProductId(product.product_id);
+        // console.log('scripts: ',scripts);
+        // 渲染每个脚本
+        for (const script of scripts) {
+          try {
+            // 调用TTS接口渲染音频
+            const buffer = await textToSpeech(
+              voiceCharacter.app_key || '',
+              voiceCharacter.access_key_secret || '',
+              script.text_content,
+              voiceCharacter.voice_id || ''
+            );
 
-          // 保存音频文件
-          const fileName = `audio/${product.product_id}/${script.id}.wav`;
-          const fullPath = await window.$mapi.file.fullPath(fileName);
+            // 保存音频文件
+            const fileName = `audio/${product.product_id}/${script.id}.wav`;
+            const fullPath = await window.$mapi.file.fullPath(fileName);
 
-          // 确保目录存在
-          await window.$mapi.file.mkdir(`audio/${product.product_id}`, { isFullPath: true });
+            // 确保目录存在
+            await window.$mapi.file.mkdir(`audio/${product.product_id}`, { isFullPath: true });
 
-          // 写入音频文件
-          await window.$mapi.file.writeBuffer(fullPath, buffer, { isFullPath: true });
+            // 写入音频文件
+            await window.$mapi.file.writeBuffer(fullPath, buffer, { isFullPath: true });
 
-          // 更新脚本的音频URL
-          await ProductScriptService.update(script.id!, {
-            audio_url: PathManager.toStoragePath(fullPath),
-            updater: 'current_user'
-          });
+            // 更新脚本的音频URL
+            await ProductScriptService.update(script.id!, {
+              audio_url: PathManager.toStoragePath(fullPath),
+              updater: 'current_user'
+            });
 
-        } catch (error) {
-          await window.$mapi.log.error(`产品 ${productName} 的语音 ${script.id} 克隆失败`);
-          throw new Error(`产品 ${productName} 的语音 ${script.id} 克隆失败`);
+          } catch (error) {
+            await window.$mapi.log.error(`产品 ${productName} 的语音 ${script.id} 克隆失败`);
+            throw new Error(`产品 ${productName} 的语音 ${script.id} 克隆失败`);
+          }
         }
       }
-    }
 
-    Message.success('语音克隆完成，开始上传服务器进行素材渲染...');
-    await window.$mapi.log.info('语音克隆完成，开始上传服务器进行素材渲染...');
-    // 遍历所有产品的脚本，逐个上传音频进行渲染
-    for (const product of products) {
-      const scripts = await ProductScriptService.listByProductId(product.product_id);
-      try{
-        console.log('1231111')
-        const params = {
-          xingxiangId:currentProductScene.value?.anchor_id,
-          liveId: liveId,
-          productId: product.product_id,
-          audioFiles: scripts.map((script) => ({
-            scriptId: script.id!,
-            audioPath: script.audio_url!
-          }))
-        };
-        await MusetalkUtils.submitRenderTask(params);
-        // await window.$mapi.log.info(`产品 ${product.product_id} 的脚本 ${script.id} 渲染任务已提交`);
-        //  这里是希望得到渲染的进度 不过以后再说
-      }catch(error){
-        // await window.$mapi.log.error(`产品 ${product.product_id} 的脚本 ${script.id} 渲染任务提交失败: ${error}`);
-        throw error;
+      await window.$mapi.log.info('语音克隆完成，createRenderTask...');
+    }
+    await getAudio();
+    console.log('完成getAudio') // ok
+    createRenderTask = async () => {
+      // 首先创建目录  这个东西
+      const taskId = Date.now();
+      const fileName = `audio/taskByRoom/${taskId}/`;
+      const fullPath = await window.$mapi.file.fullPath(fileName); // C:\Users\Alan\AppData\Roaming\aigcpanel\data\audio\taskByRoom\1741227299548\
+      window.$mapi.file.mkdir(fullPath, { isFullPath: true })
+      // 然后都扔进去   顺便拿到形象和音频的映射关系
+      let imageIdList: string[] = [];
+      let audioIdList: string[] = [];
+      console.log('products: ',products);
+      for (let product of products) {
+        console.log('product: ');
+        console.log(product);
+
+        let a = await ProductSceneService.listByProductId(product.product_id);
+        console.log('屏幕', a)
+        let anchor_id = a[0].anchor_id;
+
+        const scripts = await ProductScriptService.listByProductId(product.product_id);
+        for (const script of scripts) {
+          imageIdList.push(anchor_id);
+          audioIdList.push(script.id as any)
+          a = null as any;
+          let audioPath = `audio/${product.product_id}/${script.id}.wav`;
+          let fullAudioPath = await window.$mapi.file.fullPath(audioPath);
+          console.log('fullAudioPath: ' + fullAudioPath);
+          await window.$mapi.file.copy(fullAudioPath, fullPath + `/${script.id}.wav`, { isFullPath: true });
+        }
       }
-    }
+      // 然后压缩起来 并且用localStorage 存储taskId和roomId的映射关系
+      let urlOfZiped = await window.$mapi.file.zipFolder(fullPath, { isFullPath: true });
+      let saveMap = (a,b) => {
+        let o = StorageUtil.getArray('roomId2taskId');
+        o.push({ roomId: a, taskId: String(b) });
+        StorageUtil.set('roomId2taskId', o);
+      }
+      saveMap(liveId, taskId);
 
-    // 更新直播间状态
+      let params = {  // 接口所需参数
+        clientId: '',
+        userId: '',
+        parentTaskId: String(taskId),
+        imageIdList: imageIdList,
+        audioIdList: audioIdList,
+        file: urlOfZiped as any,
+      }
+      console.log('params', params)
+      // await MusetalkUtils.submitRenderTask(params);
+
+
+    };
+    await createRenderTask()
+    // throw new Error('');  // 暂时阻止继续
+    // 更新直播间状态   具体来说 在数据库中更新表状态
     await LiveBroadcastService.update(liveId, {
-      state: 'created',
+      state: LiveRoomState.CREATING,
       update_date: new Date().toISOString(),
       updater: 'current_user'
     });
 
-    Message.success('克隆成功');
-    // 通知父组件刷新列表
-    emit('refresh');
+    // 这里可能需要一个跳回到主页面的逻辑 
+    await window.$mapi.log.info("服务器渲染中");
+    router.push('/live');
   } catch (error) {
     await window.$mapi.log.error('克隆失败：' + error);
-    Message.error('克隆失败');
+    Message.error('克隆失败');  // 以及处理
   }
 };
 
@@ -1658,7 +1695,7 @@ const sendComment = async () => {
 const handleSceneControlClose = () => {
   showSceneControlDialog.value = false;
   // 停止直播状态
-  updateLiveState('created');
+  updateLiveState(LiveRoomState.CREATED);
   // 清空公屏信息
   publicScreenComments.value = [];
 };
@@ -1823,7 +1860,7 @@ const sceneControlDialogRef = ref<InstanceType<typeof SceneControlDialog> | null
           </div>
           <div class="mt-4 flex justify-center">
             <a-button v-if="showStartLiveButton" type="primary"
-              :status="liveRoom?.state === 'created' ? 'success' : 'danger'" @click="handleStartLive">
+              :status="liveRoom?.state === LiveRoomState.CREATED ? 'success' : 'danger'" @click="handleStartLive">
               {{ isLiveButtonText }}
             </a-button>
           </div>
@@ -2356,4 +2393,3 @@ const sceneControlDialogRef = ref<InstanceType<typeof SceneControlDialog> | null
   color: white;
 }
 </style>
-

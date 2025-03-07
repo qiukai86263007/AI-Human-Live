@@ -16,6 +16,7 @@ const absolutePath = (path: string) => {
     return `ABS://${path}`;
 };
 
+// 如果路径以 "ABS://" 开头，则去掉前缀并返回 否则拼接root
 const fullPath = async (path: string) => {
     await waitAppEnvReady();
     if (path.startsWith("ABS://")) {
@@ -664,42 +665,48 @@ const download = async (
     const res = await fetch(url, {
         method: "GET",
         headers: {
-            "User-Agent": Apps.getUserAgent(),
+            // "User-Agent": Apps.getUserAgent(),
         },
     });
+    console.log('res',res)
     if (!res.ok) {
         throw new Error(`DownloadError:${url}`);
     }
+    let downloadByNodeEnv = async ()=>{
+        const contentLength = res.headers.get("content-length");
+        const totalSize = contentLength ? parseInt(contentLength, 10) : null;
+        let downloaded = 0;
 
-    const contentLength = res.headers.get("content-length");
-    const totalSize = contentLength ? parseInt(contentLength, 10) : null;
-    let downloaded = 0;
+        const writeStream = fs.createWriteStream(fp);
+        const reader = res.body.getReader()
 
-    // @ts-ignore
-    const readableStream = Readable.fromWeb(res.body);
-    const fileStream = fs.createWriteStream(fp);
-    return new Promise((resolve, reject) => {
-        readableStream
-            .on("data", (chunk) => {
-                // console.log('download.data', chunk.length)
-                downloaded += chunk.length;
-                if (totalSize) {
-                    option.progress &&
-                        option.progress(downloaded / totalSize, totalSize);
-                }
-                fileStream.write(chunk);
-            })
-            .on("end", () => {
-                // console.log('download.end')
-                fileStream.end();
-                resolve(undefined);
-            })
-            .on("error", (err) => {
-                // console.log('download.error', err)
-                fileStream.close();
-                reject(err);
-            });
-    });
+        const processResult = async (result: any) => {
+            if (result.done) {
+                console.log('Download complete');
+                writeStream.end();
+                return;
+            }
+    
+            const chunk = result.value;
+            downloaded += chunk.length;
+            writeStream.write(chunk);
+    
+            let percent = (downloaded / totalSize);
+            if(option.progress){
+                option.progress(percent, totalSize)
+            }else{
+                console.log(`Downloaded ${((percent * 100).toFixed(2))}% of ${totalSize} bytes`);
+            }
+            option.progress && option.progress(percent, totalSize);
+
+            // 递归读取下一个数据块
+            reader.read().then(processResult);
+        };
+    
+        reader.read().then(processResult);
+
+    }
+    downloadByNodeEnv()
 };
 
 export default {
