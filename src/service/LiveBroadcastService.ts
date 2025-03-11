@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
 import { TimeUtil } from "../lib/util";
 import { LiveRoomState } from '../types/liveRoomState';
 
@@ -46,7 +45,6 @@ export const LiveBroadcastService = {
 
     async create(record: LiveBroadcastRecord) {
         const now = TimeUtil.timestampMS()
-        record.id = uuidv4()
         record.state = LiveRoomState.EDITING
         record.create_date = new Date(now).toISOString()
         record.update_date = new Date(now).toISOString()

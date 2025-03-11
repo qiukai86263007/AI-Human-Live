@@ -1,12 +1,21 @@
+<!--
+ * @Author: zhjiajia 46287134@qq.com
+ * @Date: 2025-03-03 17:32:38
+ * @LastEditors: zhjiajia 46287134@qq.com
+ * @LastEditTime: 2025-03-11 16:11:28
+ * @FilePath: \workRome\AI-Human-Live\src\layouts\Main.vue
+ * @Description: 
+-->
 <script setup lang="ts">
 import {onBeforeMount, onMounted, ref} from "vue";
+import { useRoute } from "vue-router";
 import PageNav from "./../components/PageNav.vue";
 import {AppConfig} from "../config";
 import AppQuitConfirm from "../components/AppQuitConfirm.vue";
 
 const appQuitConfirm = ref<InstanceType<typeof AppQuitConfirm> | null>(null);
 const platformName = ref('')
-
+const route = useRoute();
 const doQuit = async () => {
     await appQuitConfirm.value?.show()
 }
@@ -52,7 +61,16 @@ onMounted(() => {
                     <PageNav/>
                 </div>
                 <div class="flex-grow overflow-y-auto">
-                    <router-view></router-view>
+                    <router-view v-slot="{ Component }">
+                        <template v-if="route.meta.keepAlive">
+                            <keep-alive>
+                                <component :is="Component" />
+                            </keep-alive>
+                        </template>
+                        <template v-else>
+                            <component :is="Component" />
+                        </template>
+                    </router-view>
                 </div>
             </div>
         </div>

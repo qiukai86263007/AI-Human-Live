@@ -1463,7 +1463,7 @@ watch(() => currentProduct.value?.id, async (newId) => {
 const handleStartClone = async () => {
   let products;
   let checkNecessary, getAudio, createRenderTask;
-  let liveId = route.query.id as string;
+  const liveId = route.query.id as string;
   try {
 
     checkNecessary = () => {
@@ -1552,15 +1552,14 @@ const handleStartClone = async () => {
     await getAudio();
     console.log('完成getAudio') // ok
     createRenderTask = async () => {
-      // 首先创建目录  这个东西
-      const taskId = Date.now();
-      const fileName = `audio/taskByRoom/${taskId}/`;
+      // 首先创建目录
+      const fileName = `audio/taskByRoom/${liveId}/`;
       const fullPath = await window.$mapi.file.fullPath(fileName); // C:\Users\Alan\AppData\Roaming\aigcpanel\data\audio\taskByRoom\1741227299548\
       window.$mapi.file.mkdir(fullPath, { isFullPath: true })
       // 然后都扔进去   顺便拿到形象和音频的映射关系
       let imageIdList: string[] = [];
       let audioIdList: string[] = [];
-      console.log('products: ',products);
+      console.log('products: ', products);
       for (let product of products) {
         console.log('product: ');
         console.log(product);
@@ -1580,30 +1579,25 @@ const handleStartClone = async () => {
           await window.$mapi.file.copy(fullAudioPath, fullPath + `/${script.id}.wav`, { isFullPath: true });
         }
       }
-      // 然后压缩起来 并且用localStorage 存储taskId和roomId的映射关系
+      // 然后压缩起来
       let urlOfZiped = await window.$mapi.file.zipFolder(fullPath, { isFullPath: true });
-      let saveMap = (a,b) => {
-        let o = StorageUtil.getArray('roomId2taskId');
-        o.push({ roomId: a, taskId: String(b) });
-        StorageUtil.set('roomId2taskId', o);
-      }
-      saveMap(liveId, taskId);
 
       let params = {  // 接口所需参数
         clientId: '',
         userId: '',
-        parentTaskId: String(taskId),
+        parentTaskId: String(liveId), // 之前用时间戳 但现在修复了roomId的唯一性
         imageIdList: imageIdList,
         audioIdList: audioIdList,
         file: urlOfZiped as any,
       }
-      console.log('params', params)
+      console.log('params', params, 'liveId', liveId)
       // await MusetalkUtils.submitRenderTask(params);
 
 
     };
     await createRenderTask()
     // throw new Error('');  // 暂时阻止继续
+
     // 更新直播间状态   具体来说 在数据库中更新表状态
     await LiveBroadcastService.update(liveId, {
       state: LiveRoomState.CREATING,
@@ -1612,7 +1606,7 @@ const handleStartClone = async () => {
     });
 
     // 这里可能需要一个跳回到主页面的逻辑 
-    await window.$mapi.log.info("服务器渲染中");
+    await window.$mapi.log.info("提交了渲染请求，返回live页了");
     router.push('/live');
   } catch (error) {
     await window.$mapi.log.error('克隆失败：' + error);

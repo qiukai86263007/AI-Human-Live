@@ -5,6 +5,8 @@ import fs from "node:fs";
 import { StrUtil, TimeUtil } from "../../lib/util";
 import Apps from "../app";
 import { Readable } from "node:stream";
+import AdmZip from "adm-zip";
+import { t } from "../../config/lang";
 
 const nodePath = path;
 
@@ -78,6 +80,18 @@ const mkdir = async (path: string, option?: { isFullPath?: boolean }) => {
     if (!fs.existsSync(fp)) {
         fs.mkdirSync(fp, { recursive: true });
     }
+};
+const unzipFolder = async (
+    path: string,
+    option?: { isFullPath?: boolean }
+) => {
+    let zip = new AdmZip(path); // 测试ok
+    let zipDir = nodePath.dirname(path);
+    let t = nodePath.basename(path,nodePath.extname(path))  // 获取不带后缀的文件名
+    let targetPath = nodePath.join(zipDir, t+'unzipped')
+    zip.extractAllTo(targetPath,true);
+    return targetPath;
+
 };
 const zipFolder = async (path: string, option?: { isFullPath?: boolean }) => {
     // path默认为fullpath
@@ -715,6 +729,7 @@ export default {
     exists,
     isDirectory,
     mkdir,
+    unzipFolder,
     zipFolder,
     list,
     listAll,

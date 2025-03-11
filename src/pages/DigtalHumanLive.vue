@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch, onMounted, onActivated, onDeactivated } from 'vue';
 import { Message, Modal } from '@arco-design/web-vue';
 import CreateLiveRoomDialog from '../components/Live/CreateLiveRoomDialog.vue';
 import LiveBroadcastService, { LiveBroadcastRecord } from '../service/LiveBroadcastService';
@@ -7,6 +7,8 @@ import LiveProductService from '../service/LiveProductService';
 import ProductSceneService from '../service/ProductSceneService';
 import { useRouter } from 'vue-router';
 import { LiveRoomState } from '../types/liveRoomState';
+import { StorageUtil } from '../lib/storage'
+import { MusetalkUtils } from '../utils/MusetalkUtils';
 
 import { useMyStore } from '../store/modules/myStore';
 import { getStatus } from '../utils/VoiceCloneUtils';
@@ -47,6 +49,7 @@ const typeOptions = [
 const loadLiveRooms = async () => {
   try {
     liveRooms.value = await LiveBroadcastService.list();
+    console.log('加载直播间列表:', liveRooms.value);
     store.livesList = liveRooms.value.map(i=>{
       return {
         id: i.id,
@@ -158,10 +161,13 @@ const queryIsDownloadable = async (list) => {
     await Promise.all(promises)
     isQuerying = false;
     if (gettingList.length) {
-      queryIsDownloadable(gettingList);
+      setTimeout(() => {
+        queryIsDownloadable(gettingList);
+      }, 1000);
     }
   }
 }
+// 实际需要用到MusetalkUtils.getTaskStatus(taskId)然后再.then
 const mockQuery = async ():Promise<MockQueryResponse> => new Promise((resolve,reject)=>{
   setTimeout(()=>{
     let a :MockQueryResponse = {
@@ -178,21 +184,46 @@ const mockQuery = async ():Promise<MockQueryResponse> => new Promise((resolve,re
     resolve(a)
   },100)
 })
-
-const loopQuery = async () => {
-  // 模拟fetch
-
+const mockVideos = [
+  { videoPath1:'1',videoName:'1.mp4' },
+  { videoPath2:'2',videoName:'2.mp4' },
+  { videoPath3:'3',videoName:'3.mp4' }
+]
+const sendDownloadRequest = async id =>{
+  /* 这里 会发起getRenderedViews(taskId: string)  以及其他逻辑处理
+    希望在getRenderedViews返回已经解压缩好了的文件路径
+    然后这个函数中 根据表中的update事件 确定好视频的顺序 然后剩下的就是考虑拼接播放了
+   */
+  id = '78ce0232-5795-469d-a5d7-ea0776be0349'
+  let path = await MusetalkUtils.mockGetRenderedViews(id);
+  console.log('已经拿到视频文件夹:',path)
+  
+  // 下面确定视频顺序  
+  // let getDefaultSequence = ()
 }
-const sendDownloadRequest = (id)=>{
-  console.log('sendDownloadRequest-id:',id)
+function mockGetRenderViews(id){
+  // .then(async r=>{       // 更新直播状态为 待直播
+  //   await LiveBroadcastService.update(liveId, {
+  //     state: LiveRoomState.CREATED,
+  //     update_date: new Date().toISOString(),
+  //     updater: 'current_user'
+  //   });
+  // })
 }
+
+
+
 
 
 // 组件挂载时加载数据
 onMounted(() => {
   loadLiveRooms();
+  console.log('```onMounted```')
 });
-
+onActivated(()=>{
+  loadLiveRooms();
+  console.log('```onActivated```')
+})
 const handleCreate = () => {
   createDialog.value?.show();
 };
@@ -228,6 +259,7 @@ const getStateText = (state?: string) => {
 };
 
 const handleRoomClick = (room: LiveBroadcastRecord) => {
+  console.log('handleRoomClick roomId:', room.id);
   if (!room.id) return;
   router.push({
     path: '/live-room/edit',

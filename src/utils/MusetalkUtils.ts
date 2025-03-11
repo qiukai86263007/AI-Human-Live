@@ -2,7 +2,7 @@
  * @Author: error: error: git config user.name & please set dead value or install git && error: git config user.email & please set dead value or install git & please set dead value or install git
  * @Date: 2025-03-03 17:32:38
  * @LastEditors: zhjiajia 46287134@qq.com
- * @LastEditTime: 2025-03-11 15:08:21
+ * @LastEditTime: 2025-03-11 16:06:00
  * @FilePath: \workRome\AI-Human-Live\src\utils\MusetalkUtils.ts
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -118,17 +118,48 @@ export class MusetalkUtils {
                 method: "GET",
             }
         )
-        .then(async res=>{
+        // .then(async res=>{
+        //     let d = await res.json();
+        //     if(res.ok){
+        //         // 一整个的zip
+        //     }else{
+        //         Message.error(d.msg);
+        //         window.$mapi.log.error(
+        //             "getRenderedViews:" + d.msg + d.code
+        //         );
+        //     }
+        // })
+        // 这里来模拟一下
+        .then(async res => {
             let d = await res.json();
             if(res.ok){
-                // 逐个的进行downloadVideo
-            }else{
+                // 一整个的zip
+                // let buffer = await window.$mapi.file.readBuffer(d.data, {
+                //     isFullPath: true,
+                // });
+                // let blob = new Blob([buffer], { type: "application/zip" });
+                // let file = new File([blob], `${taskId}.zip`);
+                
+                // 假设已经将buffer流读在了本地
+                
+            }else {
                 Message.error(d.msg);
                 window.$mapi.log.error(
                     "getRenderedViews:" + d.msg + d.code
                 );
             }
         })
+    }
+    static async mockGetRenderedViews(taskId: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            setTimeout(async () => {
+                let zipFilePath = String.raw`C:\Users\Alan\AppData\Roaming\aigcpanel\data\audio\taskByRoom` // 这个路径应该在video下
+                zipFilePath = zipFilePath + `\\${taskId}.zip`
+                let unzipPath = await window.$mapi.file.unzipFolder(zipFilePath);   // 返回视频所在文件夹
+                console.log('unzipPath',unzipPath)
+                resolve(unzipPath);
+            }, 20);
+        });
     }
     static async getTaskStatus(taskId: string): Promise<any> {
         return fetch(
