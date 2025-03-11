@@ -1,34 +1,39 @@
 <template>
-  <div 
-    v-show="modelValue" 
+  <div
+    v-show="modelValue"
     class="draggable-window"
-    :style="{ 
-      left: position.x + 'px', 
+    :class="{ 'minimized': isMinimized }"
+    :style="{
+      left: position.x + 'px',
       top: position.y + 'px',
-      width: size.width + 'px',
-      height: size.height + 'px'
+      width: isMinimized ? '300px' : size.width + 'px',
+      height: isMinimized ? '60px' : size.height + 'px'
     }"
     ref="dragRef"
   >
-    <div class="resize-handle top" @mousedown.stop="startResize('top')"></div>
-    <div class="resize-handle right" @mousedown.stop="startResize('right')"></div>
-    <div class="resize-handle bottom" @mousedown.stop="startResize('bottom')"></div>
-    <div class="resize-handle left" @mousedown.stop="startResize('left')"></div>
-    <div class="resize-handle top-left" @mousedown.stop="startResize('top-left')"></div>
-    <div class="resize-handle top-right" @mousedown.stop="startResize('top-right')"></div>
-    <div class="resize-handle bottom-left" @mousedown.stop="startResize('bottom-left')"></div>
-    <div class="resize-handle bottom-right" @mousedown.stop="startResize('bottom-right')"></div>
+    <div v-if="!isMinimized" class="resize-handle top" @mousedown.stop="startResize('top')"></div>
+    <div v-if="!isMinimized" class="resize-handle right" @mousedown.stop="startResize('right')"></div>
+    <div v-if="!isMinimized" class="resize-handle bottom" @mousedown.stop="startResize('bottom')"></div>
+    <div v-if="!isMinimized" class="resize-handle left" @mousedown.stop="startResize('left')"></div>
+    <div v-if="!isMinimized" class="resize-handle top-left" @mousedown.stop="startResize('top-left')"></div>
+    <div v-if="!isMinimized" class="resize-handle top-right" @mousedown.stop="startResize('top-right')"></div>
+    <div v-if="!isMinimized" class="resize-handle bottom-left" @mousedown.stop="startResize('bottom-left')"></div>
+    <div v-if="!isMinimized" class="resize-handle bottom-right" @mousedown.stop="startResize('bottom-right')"></div>
 
-    <div class="window-header" @mousedown="startDrag">
-      <div class="title">场控设置</div>
+    <div class="window-header">
+      <div class="title">场控[请先登录-最小化-勿关]</div>
       <div class="controls">
+        <a-button type="text" size="mini" @click="toggleMinimize" class="mr-2">
+          <icon-minus v-if="!isMinimized" />
+          <icon-expand v-else />
+        </a-button>
         <a-button type="text" size="mini" @click="handleCancel">
           <icon-close />
         </a-button>
       </div>
     </div>
-    
-    <div class="window-content">
+
+    <div v-show="!isMinimized" class="window-content">
       <div class="live-room">
         <a-layout>
           <a-layout-content>
@@ -37,14 +42,13 @@
                 v-if="modelValue"
                 ref="webviewRef"
                 :src="initialUrl"
-                
                 allowpopups
                 class="h-[800px] w-full"
                 style="display:inline-flex;"
               ></webview>
             </div>
           </a-layout-content>
-          
+
           <a-layout-sider :style="{ width: '300px' }">
             <div class="comment-list">
               <div class="comment-header">
@@ -78,7 +82,7 @@
 import { ref, onUnmounted, onMounted, nextTick, defineProps, defineEmits, watch, computed } from 'vue';
 import { Message } from '@arco-design/web-vue';
 import type { WebviewTag } from 'electron';
-import { IconClose } from '@arco-design/web-vue/es/icon';
+import { IconClose, IconMinus, IconExpand } from '@arco-design/web-vue/es/icon';
 import { ipcRenderer } from 'electron';
 
 const props = defineProps({
@@ -154,6 +158,9 @@ let startResizePos = { x: 0, y: 0 };
 // Add productQA interval
 const productQAInterval = ref<number | null>(null);
 
+// Add minimum state
+const isMinimized = ref(false);
+
 // Add watch for modelValue
 watch(() => props.modelValue, (newVal) => {
   if (newVal) {
@@ -187,16 +194,16 @@ const loadLiveRoom = () => {
     Message.warning('请输入直播间地址');
     return;
   }
-  
+
   try {
     const url = new URL(formState.value.liveUrl);
     if (!url.hostname.includes('kuaishou.com') && !url.hostname.includes('douyin.com')) {
       Message.error('请输入正确的快手或抖音直播间地址');
       return;
     }
-    
+
     platform.value = url.hostname.includes('kuaishou.com') ? 'kuaishou' : 'douyin';
-    
+
     if (webviewRef.value) {
       webviewRef.value.loadURL(url.href);
       stopCollection();
@@ -208,7 +215,7 @@ const loadLiveRoom = () => {
 
 const startCollection = () => {
   if (!webviewRef.value) return;
-  
+
   const collectComments = () => {
     const kuaishouScript = `
       (() => {
@@ -216,7 +223,7 @@ const startCollection = () => {
           // 获取弹幕容器
           const wrapper = document.querySelector('.wrapper.flex-1.flex-col');
           if (!wrapper) return [];
-          
+
           // 获取所有非系统消息的弹幕
           const messages = Array.from(wrapper.querySelectorAll('.comment-cell')).filter(item => {
             // 过滤掉系统消息和已处理的消息
@@ -225,30 +232,30 @@ const startCollection = () => {
             item.dataset.processed = 'true';
             return true;
           });
-          
+
           if (!messages.length) return [];
-          
+
           const comments = [];
           messages.forEach(message => {
             try {
               const usernameElement = message.querySelector('.username');
               const commentElement = message.querySelector('.comment');
-              
+
               if (!usernameElement || !commentElement) {
                 console.log('找不到用户名或内容元素:', message.innerHTML);
                 return;
               }
-              
+
               const username = usernameElement.textContent.replace('：', '').trim();
               let content = '';
-              
+
               const innerSpan = commentElement.querySelector('span span:last-child');
               if (innerSpan) {
                 content = innerSpan.textContent?.trim() || '';
               } else {
                 content = commentElement.textContent?.trim() || '';
               }
-              
+
               if (username && content) {
                 const timestamp = new Date().getTime();
                 comments.push({
@@ -262,7 +269,7 @@ const startCollection = () => {
               console.error('处理单条弹幕出错:', e);
             }
           });
-          
+
           return comments;
         } catch (e) {
           console.error('采集弹幕出错:', e);
@@ -276,27 +283,27 @@ const startCollection = () => {
         try {
           const messages = document.querySelectorAll('.webcast-chatroom___item.webcast-chatroom___enter-done');
           if (!messages.length) return [];
-          
+
           const comments = [];
           messages.forEach(message => {
             try {
               const username = message.querySelector('.u2QdU6ht')?.textContent?.replace('：', '').trim();
               const contentElement = message.querySelector('.WsJsvMP9');
-              
+
               if (!username || !contentElement) return;
-              
+
               let content = '';
               const textElement = contentElement.querySelector('.webcast-chatroom___content-with-emoji-text');
               if (textElement) {
                 content = textElement.textContent?.trim() || '';
               }
-              
+
               const emojiElements = contentElement.querySelectorAll('.webcast-chatroom___content-with-emoji-emoji img');
               const emojis = Array.from(emojiElements).map(img => img.alt || '').filter(Boolean);
               if (emojis.length > 0) {
                 content += ' ' + emojis.join(' ');
               }
-              
+
               if (content) {
                 const timestamp = new Date().getTime();
                 comments.push({
@@ -310,7 +317,7 @@ const startCollection = () => {
               console.error('处理单条弹幕出错:', e);
             }
           });
-          
+
           return comments;
         } catch (e) {
           console.error('采集弹幕出错:', e);
@@ -325,15 +332,15 @@ const startCollection = () => {
       if (Array.isArray(result) && result.length > 0) {
         const currentTime = new Date().getTime();
         const newComments = result.filter(comment => {
-          const isDuplicate = comments.value.some(existing => 
-            existing.id === comment.id || 
-            (existing.username === comment.username && 
-             existing.content === comment.content && 
+          const isDuplicate = comments.value.some(existing =>
+            existing.id === comment.id ||
+            (existing.username === comment.username &&
+             existing.content === comment.content &&
              (currentTime - new Date(existing.time).getTime()) < 60000)
           );
           return !isDuplicate;
         });
-        
+
         if (newComments.length > 0) {
           comments.value.push(...newComments);
           emit('onNewComments', newComments);
@@ -343,7 +350,7 @@ const startCollection = () => {
       console.error('执行弹幕采集脚本出错:', error);
     });
   };
-  
+
   collectComments();
   collectInterval.value = window.setInterval(collectComments, 1000);
 
@@ -373,23 +380,23 @@ const stopCollection = () => {
 
 const sendComment = async (text: string) => {
   if (!webviewRef.value || !text) return;
-  
+
   try {
-    const script = platform.value === 'kuaishou' 
+    const script = platform.value === 'kuaishou'
       ? `
         (() => {
           const container = document.querySelector('div.chat-actions');
           if (!container) throw new Error('找不到评论区容器');
-          
+
           const input = container.querySelector('textarea.box-boder[max-length="40"]');
           if (!input) throw new Error('找不到输入框元素');
-          
+
           input.value = ${JSON.stringify(text)};
           input.dispatchEvent(new Event('input', { bubbles: true }));
-          
+
           const sendBtn = container.querySelector('div.submit-button');
           if (!sendBtn) throw new Error('找不到发送按钮');
-          
+
           setTimeout(() => {
             sendBtn.click();
           }, 100);
@@ -399,17 +406,17 @@ const sendComment = async (text: string) => {
         (() => {
           const input = document.querySelector('.webcast-chatroom___textarea');
           if (!input) throw new Error('找不到评论输入框');
-          
+
           input.value = ${JSON.stringify(text)};
           input.dispatchEvent(new Event('input', { bubbles: true }));
-          
+
           const sendBtn = document.querySelector('.webcast-chatroom___send-btn');
           if (!sendBtn) throw new Error('找不到发送按钮');
-          
+
           sendBtn.click();
         })()
       `;
-    
+
     await webviewRef.value.executeJavaScript(script);
     return true;
   } catch (error) {
@@ -420,7 +427,7 @@ const sendComment = async (text: string) => {
 
 const handleSendComment = async () => {
   if (!commentText.value) return;
-  
+
   try {
     await sendComment(commentText.value);
     commentText.value = '';
@@ -438,7 +445,7 @@ const startAutoReply = async () => {
 
   if (platform.value === 'kuaishou') {
     console.log('满足启动条件，开始启动自动回复');
-    
+
     // 产品问答的回复函数
     const handleProductQA = async () => {
       const unrepliedComments = comments.value.filter(comment => !repliedComments.has(comment.id));
@@ -451,7 +458,7 @@ const startAutoReply = async () => {
           if (props.productQA) {
             console.log('产品问答功能已开启，开始处理评论:', commentToReply.content);
             const qaResult = await getProductQAReply(commentToReply.content);
-            
+
             if (qaResult.matched) {
               console.log('产品问答匹配成功，准备发送回复:', qaResult.content);
               await sendComment(qaResult.content);
@@ -501,7 +508,7 @@ const startAutoReply = async () => {
         productQAInterval.value = window.setInterval(handleProductQA, 1000);
         console.log('产品问答定时器已设置，间隔: 1000ms');
       }
-      
+
       // 如果定时引导开启，设置独立的定时器
       if (props.welcomeGuide) {
         const { intervalTime } = await getGuideReplyContent();
@@ -538,20 +545,20 @@ const stopAutoReply = () => {
 
 const getGuideReplyContent = async () => {
   // 从数据库获取定时引导的内容、概率字段和时间间隔
-  const guideSql = `SELECT 
-    guide_all_contents, guide_follow_contents, 
+  const guideSql = `SELECT
+    guide_all_contents, guide_follow_contents,
     guide_cost_contents, guide_share_contents,
     guide_all_chance, guide_follow_chance,
     guide_cost_chance, guide_share_chance,
     interval_time
-  FROM regular_interaction_config 
-  WHERE state = 'normal' 
-  ORDER BY create_date DESC 
+  FROM regular_interaction_config
+  WHERE state = 'normal'
+  ORDER BY create_date DESC
   LIMIT 1`;
 
   const result = await window.$mapi.db.first(guideSql);
   console.log('数据库返回的原始interval_time:', result?.interval_time);
-  
+
   if (!result) return { content: '', intervalTime: 10000 };
 
   interface ContentItem {
@@ -566,21 +573,21 @@ const getGuideReplyContent = async () => {
 
   // 解析内容和计算概率
   const contentGroups: ContentGroup[] = [
-    { 
-      contents: result.guide_all_contents ? JSON.parse(result.guide_all_contents) : [], 
-      chance: result.guide_all_chance || 0 
+    {
+      contents: result.guide_all_contents ? JSON.parse(result.guide_all_contents) : [],
+      chance: result.guide_all_chance || 0
     },
-    { 
-      contents: result.guide_follow_contents ? JSON.parse(result.guide_follow_contents) : [], 
-      chance: result.guide_follow_chance || 0 
+    {
+      contents: result.guide_follow_contents ? JSON.parse(result.guide_follow_contents) : [],
+      chance: result.guide_follow_chance || 0
     },
-    { 
-      contents: result.guide_cost_contents ? JSON.parse(result.guide_cost_contents) : [], 
-      chance: result.guide_cost_chance || 0 
+    {
+      contents: result.guide_cost_contents ? JSON.parse(result.guide_cost_contents) : [],
+      chance: result.guide_cost_chance || 0
     },
-    { 
-      contents: result.guide_share_contents ? JSON.parse(result.guide_share_contents) : [], 
-      chance: result.guide_share_chance || 0 
+    {
+      contents: result.guide_share_contents ? JSON.parse(result.guide_share_contents) : [],
+      chance: result.guide_share_chance || 0
     }
   ];
 
@@ -588,7 +595,7 @@ const getGuideReplyContent = async () => {
   const totalChance = contentGroups.reduce((sum, group) => sum + group.chance, 0);
   const calculatedIntervalTime = result.interval_time * 1000;
   console.log('计算后的intervalTime:', calculatedIntervalTime, 'ms');
-  
+
   if (totalChance <= 0) return { content: '', intervalTime: calculatedIntervalTime };
 
   let randomNum = Math.random() * totalChance;
@@ -617,28 +624,28 @@ const getGuideReplyContent = async () => {
 // 获取产品问答回复内容的内部函数
 const getProductQAReply = async (commentContent: string) => {
   console.log('开始处理产品问答匹配:', commentContent);
-  
+
   try {
     // 从QA表获取回复内容
-    const qaSql = `SELECT like_problems, replys FROM q_and_a 
+    const qaSql = `SELECT like_problems, replys FROM q_and_a
       WHERE state = 'normal'`;
-    
+
     const qaResults = await window.$mapi.db.select(qaSql);
     console.log('获取到QA数据条数:', qaResults?.length);
 
     for (const qa of qaResults) {
-      const likeProblems = Array.isArray(qa.like_problems) 
-        ? qa.like_problems 
+      const likeProblems = Array.isArray(qa.like_problems)
+        ? qa.like_problems
         : JSON.parse(qa.like_problems || '[]');
-      
-      const replies = Array.isArray(qa.replys) 
-        ? qa.replys 
+
+      const replies = Array.isArray(qa.replys)
+        ? qa.replys
         : JSON.parse(qa.replys || '[]');
 
       console.log('正在匹配问题组:', likeProblems);
-      
+
       // 查找匹配的问题
-      const matchIndex = likeProblems.findIndex(problem => 
+      const matchIndex = likeProblems.findIndex(problem =>
         commentContent.includes(problem)
       );
 
@@ -652,7 +659,7 @@ const getProductQAReply = async (commentContent: string) => {
         };
       }
     }
-    
+
     console.log('未找到匹配的问题');
     return {
       content: '',
@@ -674,7 +681,7 @@ const initWebview = () => {
     const element = webviewContainer.value?.querySelector('webview') as WebviewTag;
     if (element) {
       webviewRef.value = element;
-      
+
       element.addEventListener('dom-ready', () => {
         console.log('Webview DOM ready');
         webviewRef.value?.openDevTools();
@@ -700,25 +707,25 @@ const initWebview = () => {
 // Add dragging functionality
 const startDrag = (e: MouseEvent) => {
   if (!dragRef.value) return;
-  
+
   isDragging.value = true;
   startPos = { x: position.value.x, y: position.value.y };
   startMousePos = { x: e.clientX, y: e.clientY };
-  
+
   // 使用 electron 的 ipcRenderer 来处理拖动
   const handleDrag = async (e: MouseEvent) => {
     if (!isDragging.value) return;
-    
+
     const dx = e.clientX - startMousePos.x;
     const dy = e.clientY - startMousePos.y;
-    
+
     // 计算新位置
     const newX = startPos.x + dx;
     const newY = startPos.y + dy;
-    
+
     // 更新本地位置状态
     position.value = { x: newX, y: newY };
-    
+
     // 通过 IPC 更新窗口位置
     await ipcRenderer.invoke('window:move', null, {
       mouseX: e.offsetX,
@@ -727,7 +734,7 @@ const startDrag = (e: MouseEvent) => {
       height: size.value.height
     });
   };
-  
+
   document.addEventListener('mousemove', handleDrag);
   document.addEventListener('mouseup', () => {
     isDragging.value = false;
@@ -741,7 +748,7 @@ const startResize = (direction: string) => {
   resizeDirection.value = direction;
   startSize = { width: size.value.width, height: size.value.height };
   startResizePos = { x: position.value.x, y: position.value.y };
-  
+
   document.addEventListener('mousemove', onResize);
   document.addEventListener('mouseup', stopResize);
 };
@@ -860,7 +867,15 @@ watch(() => props.welcomeGuide, (newValue, oldValue) => {
     }
   }
 });
-</script> 
+
+// 切换最小化/还原状态
+const toggleMinimize = () => {
+  isMinimized.value = !isMinimized.value;
+
+  // 由于我们使用v-show而不是v-if，webview会一直存在于DOM中，
+  // 所以不需要重新初始化webview
+};
+</script>
 
 <style scoped>
 .arco-layout-header {
@@ -1095,4 +1110,24 @@ webview {
   height: 6px;
   cursor: se-resize;
 }
-</style> 
+
+/* 添加最小化状态的样式 */
+.minimized {
+  height: 40px !important;
+  overflow: hidden;
+  resize: none;
+}
+
+.minimized .window-header {
+  border-bottom: none;
+}
+
+/* 确保最小化时内容区域仍然存在但不可见 */
+.minimized .window-content {
+  position: absolute;
+  visibility: hidden;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+}
+</style>
