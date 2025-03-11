@@ -1329,11 +1329,11 @@ const audioPlayer = ref<HTMLAudioElement | null>(null);
 
 // 修改试听方法
 const handlePreviewVoice = async () => {
-  // 只在开启场控后允许试听
-  if (!showSceneControlDialog.value) {
-    Message.warning('请先开启场控');
-    return;
-  }
+  // // 只在开启场控后允许试听
+  // if (!showSceneControlDialog.value) {
+  //   Message.warning('请先开启场控');
+  //   return;
+  // }
 
   if (!selectedVoice.value?.audio_url) {
     Message.warning('当前主播没有试听音频');
