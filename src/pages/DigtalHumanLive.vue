@@ -121,7 +121,7 @@ const resetFilters = () => {
 /*用于下载*/
 let gettingList:any[] = [];
 let isQuerying = false;
-watch(()=>store.livesList,  // 每次onMounted 都会触发一次 提交下载请求也会更新store(TODO)
+watch(()=>store.livesList,
   async (new1,old) => {
     // console.log('livesList changed',new1,old);
     let a = new1.filter(item=>item.state == LiveRoomState.CREATING)
@@ -195,7 +195,7 @@ const sendDownloadRequest = async id =>{
     然后这个函数中 根据表中的update事件 确定好视频的顺序 然后剩下的就是考虑拼接播放了
    */
   id = '78ce0232-5795-469d-a5d7-ea0776be0349'
-  let path = await MusetalkUtils.mockGetRenderedViews(id);
+  let path = await MusetalkUtils.getRenderedViews(id);
   console.log('已经拿到视频文件夹:',path)
   
   // 下面确定视频顺序  
