@@ -67,7 +67,7 @@ const showSceneControlDialog = ref(false);
 // 添加计算属性判断是否应该禁用功能
 const shouldDisableFeatures = computed(() => {
   const state = liveRoom.value?.state as LiveRoomState;
-  return state === LiveRoomState.CREATED || state === LiveRoomState.RUNNING;
+  return state === LiveRoomState.CREATED || state === LiveRoomState.LIVE;
 });
 
 // 修改tabs定义
@@ -325,7 +325,7 @@ const deleteQA = async (categoryId: string, qaId: string) => {
 // 添加计算属性判断是否显示开始直播按钮
 const showStartLiveButton = computed(() => {
   const state = liveRoom.value?.state as LiveRoomState;
-  return state === LiveRoomState.CREATED || state === LiveRoomState.RUNNING;
+  return state === LiveRoomState.CREATED || state === LiveRoomState.LIVE;
 });
 
 const isLiveButtonText = computed(() => {
@@ -346,11 +346,11 @@ const handleStartLive = async () => {
 
   try {
     const state = liveRoom.value?.state as LiveRoomState;
-    const newState: LiveRoomState = state === LiveRoomState.CREATED ? LiveRoomState.RUNNING : LiveRoomState.CREATED;
-    const actionText = newState === LiveRoomState.RUNNING ? '启动' : '停止';
+    const newState: LiveRoomState = state === LiveRoomState.CREATED ? LiveRoomState.LIVE : LiveRoomState.CREATED;
+    const actionText = newState === LiveRoomState.LIVE ? '启动' : '停止';
 
     // 如果是要开始直播，显示确认对话框
-    if (newState === LiveRoomState.RUNNING) {
+    if (newState === LiveRoomState.LIVE) {
       Modal.confirm({
         title: '开启场控',
         content: '是否同时开启场控？',
@@ -377,7 +377,7 @@ const handleStartLive = async () => {
 const updateLiveState = async (newState: LiveRoomState) => {
   const liveId = route.query.id as string;
   try {
-    Message.loading(`正在${newState === LiveRoomState.RUNNING ? '启动' : '停止'}直播...`);
+    Message.loading(`正在${newState === LiveRoomState.LIVE ? '启动' : '停止'}直播...`);
     await LiveBroadcastService.update(liveId, {
       state: newState,
       update_date: new Date().toISOString(),
@@ -385,7 +385,7 @@ const updateLiveState = async (newState: LiveRoomState) => {
     });
 
     await loadLiveRoom();
-    Message.success(`直播已${newState === LiveRoomState.RUNNING ? '启动' : '停止'}`);
+    Message.success(`直播已${newState === LiveRoomState.LIVE ? '启动' : '停止'}`);
   } catch (error) {
     console.error('更新直播状态失败:', error);
     Message.error('更新直播状态失败');
@@ -399,7 +399,7 @@ const handleSceneControlConfirm = async (settings: any) => {
     console.log('Scene control settings:', settings);
     Message.success('场控设置已保存');
     // 更新直播状态为运行中
-    await updateLiveState(LiveRoomState.RUNNING);
+    await updateLiveState(LiveRoomState.LIVE);
   } catch (error) {
     console.error('保存场控设置失败:', error);
     Message.error('保存场控设置失败');
@@ -1473,7 +1473,7 @@ const handleStartClone = async () => {
       }
     }
     checkNecessary();
-
+    // TODO 如果根本没有产品 不允许点击克隆按钮
     products = await LiveProductService.listByLiveId(liveId);
     getAudio = async () => {
       Message.loading('正在生成台词音频...');
@@ -1550,7 +1550,7 @@ const handleStartClone = async () => {
       await window.$mapi.log.info('语音克隆完成，createRenderTask...');
     }
     await getAudio();
-    console.log('完成getAudio') // ok
+    console.log('完成getAudio')
     createRenderTask = async () => {
       // 首先创建目录
       const fileName = `audio/taskByRoom/${liveId}/`;
@@ -1559,13 +1559,9 @@ const handleStartClone = async () => {
       // 然后都扔进去   顺便拿到形象和音频的映射关系
       let imageIdList: string[] = [];
       let audioIdList: string[] = [];
-      console.log('products: ', products);
+      // console.log('products: ', products);
       for (let product of products) {
-        console.log('product: ');
-        console.log(product);
-
         let a = await ProductSceneService.listByProductId(product.product_id);
-        console.log('屏幕', a)
         let anchor_id = a[0].anchor_id;
 
         const scripts = await ProductScriptService.listByProductId(product.product_id);
@@ -1575,13 +1571,12 @@ const handleStartClone = async () => {
           a = null as any;
           let audioPath = `audio/${product.product_id}/${script.id}.wav`;
           let fullAudioPath = await window.$mapi.file.fullPath(audioPath);
-          console.log('fullAudioPath: ' + fullAudioPath);
           await window.$mapi.file.copy(fullAudioPath, fullPath + `/${script.id}.wav`, { isFullPath: true });
         }
       }
       // 然后压缩起来
       let urlOfZiped = await window.$mapi.file.zipFolder(fullPath, { isFullPath: true });
-
+      console.log('urlOfZiped: ', urlOfZiped); 
       let params = {  // 接口所需参数
         clientId: '',
         userId: '',
@@ -1590,13 +1585,12 @@ const handleStartClone = async () => {
         audioIdList: audioIdList,
         file: urlOfZiped as any,
       }
-      console.log('params', params, 'liveId', liveId)
-      // await MusetalkUtils.submitRenderTask(params);
-
-
+      console.log('params', params, 'liveId:', liveId)
+      await MusetalkUtils.submitRenderTask(params);
     };
     await createRenderTask()
-    // throw new Error('');  // 暂时阻止继续
+
+    // throw new Error('');
 
     // 更新直播间状态   具体来说 在数据库中更新表状态
     await LiveBroadcastService.update(liveId, {

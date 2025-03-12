@@ -364,6 +364,14 @@ const versions = [
                     updater: 'system'
                 },
                 {
+                    id: 'f8b21176d2ac4a8fbecf661b1848c35c',
+                    anchor_name: '主播小小',
+                    anchor_backgroud: join(anchorsPath, 'f8b21176d2ac4a8fbecf661b1848c35c.png'),
+                    state: 'normal',
+                    creator: 'system',
+                    updater: 'system'
+                },
+                {
                     id: '9d176328b70a4dfabdc988011425c76e',
                     anchor_name: '主播小范',
                     anchor_backgroud: join(anchorsPath, '9d176328b70a4dfabdc988011425c76e.png'),

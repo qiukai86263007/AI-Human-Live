@@ -89,7 +89,7 @@ export const LiveBroadcastService = {
     async start(record: LiveBroadcastRecord) {
         if (!record.id) throw new Error('Record ID is required');
         await this.update(record.id, {
-            state: LiveRoomState.RUNNING
+            state: LiveRoomState.LIVE
         })
     },
 

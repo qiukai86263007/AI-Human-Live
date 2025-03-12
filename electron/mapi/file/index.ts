@@ -88,87 +88,45 @@ const unzipFolder = async (
     let zip = new AdmZip(path); // 测试ok
     let zipDir = nodePath.dirname(path);
     let t = nodePath.basename(path,nodePath.extname(path))  // 获取不带后缀的文件名
-    let targetPath = nodePath.join(zipDir, t+'unzipped')
-    zip.extractAllTo(targetPath,true);
+    let targetPath = zipDir;
+    // let targetPath = nodePath.join(zipDir, t+'unzipped')
+    zip.extractAllTo(zipDir,true);
     return targetPath;
-
 };
+// 该函数会将path文件夹下的files压缩(压缩内容不包括文件夹本身)到path所在的同层级
 const zipFolder = async (path: string, option?: { isFullPath?: boolean }) => {
     // path默认为fullpath
-        option = Object.assign(
-            {
-                isFullPath: false,
-            },
-            option
-        );
-        let fp = path;
-        if (!option.isFullPath) {
-            fp = await fullPath(path);
+    option = Object.assign(
+        {
+            isFullPath: false,
+        },
+        option
+    );
+    let fp = path;
+    if (!option.isFullPath) {
+        fp = await fullPath(path);
+    }
+
+    // 获取目录名称
+    const folderName = nodePath.basename(fp);
+
+    // 生成输出文件路径
+    const outputFilePath = `${fp}/../${folderName}.zip`;
+
+    let zip = new AdmZip();
+    await zip.addLocalFolderPromise(fp,{}) // 需要zip的内容
+    .then(r=>{
+        zip.writeZip(outputFilePath,(err)=>{
+        if(err){
+            console.log('zipError:',err);
+        }else{
         }
+    })
+})
+return outputFilePath;
 
-        // 确保路径存在
-        if (!fs.existsSync(fp)) {
-            throw new Error(`Path does not exist: ${fp}`);
-        }
-
-        // 确保路径是目录
-        if (!fs.statSync(fp).isDirectory()) {
-            throw new Error(`Path is not a directory: ${fp}`);
-        }
-        const folderName = path.match(/[^\\]+(?=\\$)/)[0];
-        // 生成输出文件路径
-        const outputFilePath = `${fp}/../${folderName}.zip`;
-        const output = fs.createWriteStream(outputFilePath);
-
-        const archive = archiver("zip", {
-            zlib: { level: 9 }, // 层级越高 压缩越小，压缩速度越慢
-        });
-        // console.log('archive',archive)
-
-        // listen for all archive data to be written
-        // 'close' event is fired only when a file descriptor is involved
-        output.on("close", function () {
-            console.log('压缩大小'+archive.pointer() + " total bytes");
-            console.log(
-                "archiver has been finalized and the output file descriptor has closed."
-            );
-        });
-
-        // This event is fired when the data source is drained no matter what was the data source.
-        // It is not part of this library but rather from the NodeJS Stream API.
-        // @see: https://nodejs.org/api/stream.html#stream_event_end
-        output.on("end", function () {
-            console.log("Data has been drained");
-        });
-
-        // good practice to catch warnings (ie stat failures and other non-blocking errors)
-        archive.on("warning", function (err) {
-            if (err.code === "ENOENT") {
-                // log warning
-            } else {
-                // throw error
-                throw err;
-            }
-        });
-
-        // good practice to catch this error explicitly
-        archive.on("error", function (err) {
-            throw err;
-        });
-
-        // pipe archive data to the file
-        archive.pipe(output);
-
-        // append files from a sub-directory, putting its contents at the root of archive
-        console.log("folderName", folderName);
-        archive.directory(path, folderName);
-
-        // finalize the archive (ie we are done appending files but streams have to finish yet)
-        // 'close', 'end' or 'finish' may be fired right after calling this method so register to them beforehand
-        await archive.finalize();
-        console.log("zipSuccess");
-        return outputFilePath;
 };
+
 const list = async (path: string, option?: { isFullPath?: boolean }) => {
     option = Object.assign(
         {

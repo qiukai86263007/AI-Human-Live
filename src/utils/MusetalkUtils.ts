@@ -2,7 +2,7 @@
  * @Author: error: error: git config user.name & please set dead value or install git && error: git config user.email & please set dead value or install git & please set dead value or install git
  * @Date: 2025-03-03 17:32:38
  * @LastEditors: zhjiajia 46287134@qq.com
- * @LastEditTime: 2025-03-12 11:13:37
+ * @LastEditTime: 2025-03-12 15:39:58
  * @FilePath: \workRome\AI-Human-Live\src\utils\MusetalkUtils.ts
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -20,6 +20,7 @@ interface RenderParams {
     file: string;
 }
 export class MusetalkUtils {
+    private static isQuerying = false;
     /**
      * 提交音频素材渲染任务
      * @param params 渲染参数
@@ -38,6 +39,7 @@ export class MusetalkUtils {
                     isFullPath: true,
                 });
                 let blob = new Blob([buffer], { type: "application/zip" });
+                console.log('blob',blob);
                 formData.append(key, blob, `${params.parentTaskId}.zip`); // 后端逻辑通过.zip文件名称判断
             }
         }
@@ -111,8 +113,7 @@ export class MusetalkUtils {
         await window.$mapi.file.download(url, localPath, { progress: null });
     };
     // 当status为allFinished  开始下载  我会拿到一个压缩包 里面是一个viedos文件夹 名称和音频一一对应
-    static async getRenderedViews(taskId: string): Promise<void> {
-        taskId = "818c6df0-3f16-4bcc-b67e-ead92f31e134";
+    static async getRenderedViews(taskId: string): Promise<any> {
         return fetch(`${AppConfig.aiHuman.taskDownload}/${taskId}`, {
             method: "GET",
         })
@@ -120,7 +121,7 @@ export class MusetalkUtils {
                 console.log("getRenderedViews:", res); // body是一个ReadableStream 无法json
                 if (res.ok) {
                     // 一整个的zip
-                    let path = `audio/taskByRoom/${taskId}.zip`;
+                    let path = `video/${taskId}/${taskId}.zip`;
                     let fullPath = await window.$mapi.file.fullPath(path);
                     const reader = res.body.getReader();
                     let chunks = [];
@@ -139,14 +140,13 @@ export class MusetalkUtils {
                         buffer.set(chunk, position);
                         position += chunk.length;
                     }
+                    let unzipPath;
                     await window.$mapi.file.writeBuffer(fullPath, buffer, {
                         isFullPath: true,
+                    }).then(async ()=>{
+                        unzipPath = await window.$mapi.file.unzipFolder(fullPath); // 返回视频所在文件夹
                     });
-                    console.log("压缩文件已经拿到", fullPath);
-                    // let blob = new Blob([buffer], { type: "application/zip" });
-                    // let file = new File([blob], `${taskId}.zip`);
-
-                    return fullPath;
+                    return unzipPath;
                 }
             })
             .catch((rej) => {
@@ -155,29 +155,51 @@ export class MusetalkUtils {
                 window.$mapi.log.error("submitRenderTask Network error:" + rej);
             });
     }
-    static async mockGetRenderedViews(taskId: string): Promise<void> {
-        return new Promise((resolve, reject) => {
-            setTimeout(async () => {
-                let zipFilePath = String.raw`C:\Users\Alan\AppData\Roaming\aigcpanel\data\audio\taskByRoom`; // 这个路径应该在video下
-                zipFilePath = zipFilePath + `\\${taskId}.zip`;
-                let unzipPath = await window.$mapi.file.unzipFolder(
-                    zipFilePath
-                ); // 返回视频所在文件夹
-                console.log("unzipPath", unzipPath);
-                resolve(unzipPath);
-            }, 20);
-        });
-    }
+    // static async mockGetRenderedViews(taskId: string): Promise<void> {
+    //     return new Promise((resolve, reject) => {
+    //         setTimeout(async () => {
+    //             let zipFilePath = String.raw`C:\Users\Alan\AppData\Roaming\aigcpanel\data\audio\taskByRoom`; // 这个路径应该在video下
+    //             zipFilePath = zipFilePath + `\\${taskId}.zip`;
+    //             let unzipPath = await window.$mapi.file.unzipFolder(
+    //                 zipFilePath
+    //             ); // 返回视频所在文件夹
+    //             console.log("unzipPath", unzipPath);
+    //             resolve(unzipPath);
+    //         }, 20);
+    //     });
+    // }
     static async getTaskStatus(taskId: string): Promise<any> {
-        return fetch(
-            `${AppConfig.aiHuman.taskStatus}/${taskId}`, // 接口是这样 而非query
-            {
-                method: "GET",
-            }
-        )
+        // return fetch(
+        //     `${AppConfig.aiHuman.taskStatus}/${taskId}`, // 接口是这样 而非query
+        //     {
+        //         method: "GET",
+        //     }
+        // )
+        //     .then(async (res) => await res.json())
+        //     .catch((rej) => {
+        //         console.error("Network error:", rej);
+        //     });
+        if (this.isQuerying) return;
+
+        this.isQuerying = true;
+
+        try {
+            return await fetch(
+                `${AppConfig.aiHuman.taskStatus}/${taskId}`, // 接口是这样 而非query
+                {
+                    method: "GET",
+                }
+            )
             .then(async (res) => await res.json())
             .catch((rej) => {
                 console.error("Network error:", rej);
             });
+        } catch (rej) {
+            console.error("Network error:", rej);
+        } finally {
+            setTimeout(() => {
+                this.isQuerying = false;
+            }, 3000);
+        }
     }
 }
