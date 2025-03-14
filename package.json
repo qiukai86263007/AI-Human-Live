@@ -21,6 +21,7 @@
     "type": "module",
     "scripts": {
         "start": "chcp 65001 && vite",
+        "format": "prettier --write \"src/**/*.{js,ts,vue,json,css,scss,less}\"",
         "dev": "vite",
         "dev:pre": "export ELECTRON_ENV_PROD=1 && vite",
         "dev:win": "chcp 65001 && vite",
@@ -32,7 +33,8 @@
         "build:linux": "vite build && electron-builder --linux",
         "preview": "vite preview",
         "postinstall": "electron-builder install-app-deps",
-        "postuninstall": "electron-builder install-app-deps"
+        "postuninstall": "electron-builder install-app-deps",
+        "format:check": "prettier --check \"src/**/*.{js,ts,vue,json,css,scss,less}\""
     },
     "devDependencies": {
         "@arco-design/web-vue": "^2.55.3",
@@ -44,6 +46,7 @@
         "electron-builder": "^24.13.3",
         "less": "^4.2.0",
         "postcss": "^8.4.39",
+        "prettier": "^3.5.3",
         "tailwindcss": "^3.4.4",
         "typescript": "^5.4.2",
         "vite": "^5.1.5",

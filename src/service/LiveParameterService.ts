@@ -47,7 +47,7 @@ class LiveParameterService {
       data.platform,
       data.rule_list,
       data.live_room_id,
-      data.anchor_name
+      data.anchor_name,
     ]);
 
     return id;
@@ -56,16 +56,16 @@ class LiveParameterService {
   async update(id: string, data: Partial<LiveParameterRecord>): Promise<void> {
     const sets: string[] = [];
     const params: any[] = [];
-    
+
     Object.entries(data).forEach(([key, value]) => {
       if (value !== undefined && key !== 'id') {
         sets.push(`${key} = ?`);
         params.push(value);
       }
     });
-    
+
     if (sets.length === 0) return;
-    
+
     sets.push('update_date = ?');
     params.push(new Date().toISOString());
     params.push(id);
@@ -85,4 +85,4 @@ class LiveParameterService {
   }
 }
 
-export default new LiveParameterService(); 
+export default new LiveParameterService();

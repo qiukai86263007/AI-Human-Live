@@ -35,7 +35,7 @@ class QAndAConfigService {
       now,
       data.creator || 'system',
       data.creator || 'system',
-      now
+      now,
     ]);
 
     return id;
@@ -44,16 +44,16 @@ class QAndAConfigService {
   async update(id: string, data: Partial<QAndAConfigRecord>): Promise<void> {
     const sets: string[] = [];
     const params: any[] = [];
-    
+
     Object.entries(data).forEach(([key, value]) => {
       if (value !== undefined && key !== 'id') {
         sets.push(`${key} = ?`);
         params.push(value);
       }
     });
-    
+
     if (sets.length === 0) return;
-    
+
     sets.push('update_date = ?');
     params.push(new Date().toISOString());
     params.push(id);
@@ -86,25 +86,15 @@ class QAndAConfigService {
     const sql = `UPDATE ${this.tableName} 
                 SET enable = ?, updater = ?, update_date = ?
                 WHERE id = ?`;
-    await window.$mapi.db.execute(sql, [
-      enable ? 1 : 0,
-      'system',
-      new Date().toISOString(),
-      id
-    ]);
+    await window.$mapi.db.execute(sql, [enable ? 1 : 0, 'system', new Date().toISOString(), id]);
   }
 
   async updateReplyWay(id: string, replyWay: number): Promise<void> {
     const sql = `UPDATE ${this.tableName} 
                 SET reply_way = ?, updater = ?, update_date = ?
                 WHERE id = ?`;
-    await window.$mapi.db.execute(sql, [
-      replyWay,
-      'system',
-      new Date().toISOString(),
-      id
-    ]);
+    await window.$mapi.db.execute(sql, [replyWay, 'system', new Date().toISOString(), id]);
   }
 }
 
-export default new QAndAConfigService(); 
+export default new QAndAConfigService();

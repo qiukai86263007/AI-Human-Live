@@ -4,9 +4,9 @@ export interface QAndARecord {
   id?: string;
   product_id?: string;
   enable?: number;
-  problem?: string;         // 问题种类名称
+  problem?: string; // 问题种类名称
   like_problems?: string[]; // 问题列表
-  replys?: string[];       // 回答列表
+  replys?: string[]; // 回答列表
   state?: string;
   create_date?: string;
   creator?: string;
@@ -30,15 +30,15 @@ class QAndAService {
     await window.$mapi.db.execute(sql, [
       id,
       productId,
-      categoryName,    // problem 字段存储问题种类名称
-      '[]',           // 初始化空的问题数组
-      '[]',           // 初始化空的回答数组
+      categoryName, // problem 字段存储问题种类名称
+      '[]', // 初始化空的问题数组
+      '[]', // 初始化空的回答数组
       1,
       'normal',
       now,
       'system',
       'system',
-      now
+      now,
     ]);
 
     return id;
@@ -59,14 +59,14 @@ class QAndAService {
     // 更新数据库
     await this.update(categoryId, {
       like_problems,
-      replys
+      replys,
     });
   }
 
   async update(id: string, data: Partial<QAndARecord>): Promise<void> {
     const sets: string[] = [];
     const params: any[] = [];
-    
+
     Object.entries(data).forEach(([key, value]) => {
       if (value !== undefined && key !== 'id') {
         if (key === 'like_problems' || key === 'replys') {
@@ -76,9 +76,9 @@ class QAndAService {
         params.push(value);
       }
     });
-    
+
     if (sets.length === 0) return;
-    
+
     sets.push('update_date = ?');
     params.push(new Date().toISOString());
     params.push(id);
@@ -95,12 +95,12 @@ class QAndAService {
   async get(id: string): Promise<QAndARecord | null> {
     const sql = `SELECT * FROM ${this.tableName} WHERE id = ?`;
     const result = await window.$mapi.db.first(sql, [id]);
-    
+
     if (result) {
-      result.like_problems = JSON.parse(result.like_problems as string || '[]');
-      result.replys = JSON.parse(result.replys as string || '[]');
+      result.like_problems = JSON.parse((result.like_problems as string) || '[]');
+      result.replys = JSON.parse((result.replys as string) || '[]');
     }
-    
+
     return result;
   }
 
@@ -109,11 +109,11 @@ class QAndAService {
                 WHERE product_id = ? AND state = 'normal'
                 ORDER BY create_date DESC`;
     const results = await window.$mapi.db.select(sql, [productId]);
-    
+
     return results.map(result => ({
       ...result,
-      like_problems: JSON.parse(result.like_problems as string || '[]'),
-      replys: JSON.parse(result.replys as string || '[]')
+      like_problems: JSON.parse((result.like_problems as string) || '[]'),
+      replys: JSON.parse((result.replys as string) || '[]'),
     }));
   }
 
@@ -128,18 +128,13 @@ class QAndAService {
     const sql = `UPDATE ${this.tableName} 
                 SET enable = ?, updater = ?, update_date = ?
                 WHERE id = ?`;
-    await window.$mapi.db.execute(sql, [
-      enable ? 1 : 0,
-      'system',
-      new Date().toISOString(),
-      id
-    ]);
+    await window.$mapi.db.execute(sql, [enable ? 1 : 0, 'system', new Date().toISOString(), id]);
   }
 
   async addLikeProblem(id: string, problem: string): Promise<void> {
     const qa = await this.get(id);
     if (!qa) return;
-    
+
     const like_problems = qa.like_problems || [];
     if (!like_problems.includes(problem)) {
       like_problems.push(problem);
@@ -150,7 +145,7 @@ class QAndAService {
   async addReply(id: string, reply: string): Promise<void> {
     const qa = await this.get(id);
     if (!qa) return;
-    
+
     const replys = qa.replys || [];
     if (!replys.includes(reply)) {
       replys.push(reply);
@@ -159,4 +154,4 @@ class QAndAService {
   }
 }
 
-export default new QAndAService(); 
+export default new QAndAService();

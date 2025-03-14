@@ -92,7 +92,7 @@ class AudioCharacterService {
       data.hsAccessKey,
       data.version || 1,
       data.image_url,
-      data.audio_url
+      data.audio_url,
     ]);
 
     return id;
@@ -102,16 +102,16 @@ class AudioCharacterService {
   async update(id: string, data: Partial<AudioCharacterRecord>): Promise<void> {
     const sets: string[] = [];
     const params: any[] = [];
-    
+
     Object.entries(data).forEach(([key, value]) => {
       if (value !== undefined && key !== 'id') {
         sets.push(`${key} = ?`);
         params.push(value);
       }
     });
-    
+
     if (sets.length === 0) return;
-    
+
     sets.push('update_date = ?');
     params.push(new Date().toISOString());
     params.push(id);
@@ -139,4 +139,4 @@ class AudioCharacterService {
   }
 }
 
-export default new AudioCharacterService(); 
+export default new AudioCharacterService();

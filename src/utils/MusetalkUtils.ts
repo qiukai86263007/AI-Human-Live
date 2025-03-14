@@ -6,51 +6,51 @@
  * @FilePath: \workRome\AI-Human-Live\src\utils\MusetalkUtils.ts
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
-import { PathManager } from "./pathManager";
-import { AppConfig } from "../config";
-import { reject } from "lodash-es";
-import { Message } from "@arco-design/web-vue";
+import { PathManager } from './pathManager';
+import { AppConfig } from '../config';
+import { reject } from 'lodash-es';
+import { Message } from '@arco-design/web-vue';
 
 interface RenderParams {
-    clientId: string;
-    userId: string;
-    parentTaskId: string;
-    imageIdList: Array<string>;
-    audioIdList: Array<string>;
-    file: string;
+  clientId: string;
+  userId: string;
+  parentTaskId: string;
+  imageIdList: Array<string>;
+  audioIdList: Array<string>;
+  file: string;
 }
 export class MusetalkUtils {
-    private static isQuerying = false;
-    /**
-     * 提交音频素材渲染任务
-     * @param params 渲染参数
-     * @returns Promise<void>
-     */
-    static async submitRenderTask(params: RenderParams): Promise<void> {
-        console.log("到submitRenderTask了");
+  private static isQuerying = false;
+  /**
+   * 提交音频素材渲染任务
+   * @param params 渲染参数
+   * @returns Promise<void>
+   */
+  static async submitRenderTask(params: RenderParams): Promise<void> {
+    console.log('到submitRenderTask了');
 
-        let formData = new FormData();
-        console.log(params);
-        for (let key in params) {
-            if (key != "file") {
-                formData.append(key, params[key]);
-            } else if (key == "file") {
-                let buffer = await window.$mapi.file.readBuffer(params.file, {
-                    isFullPath: true,
-                });
-                let blob = new Blob([buffer], { type: "application/zip" });
-                console.log('blob',blob);
-                formData.append(key, blob, `${params.parentTaskId}.zip`); // 后端逻辑通过.zip文件名称判断
-            }
-        }
-        let consoleForm = () => {
-            console.log("----formData----");
-            let formObject = {};
-            formData.forEach((value, key) => {
-                formObject[key] = value;
-            });
-            console.log(formObject);
-            /*
+    let formData = new FormData();
+    console.log(params);
+    for (let key in params) {
+      if (key != 'file') {
+        formData.append(key, params[key]);
+      } else if (key == 'file') {
+        let buffer = await window.$mapi.file.readBuffer(params.file, {
+          isFullPath: true,
+        });
+        let blob = new Blob([buffer], { type: 'application/zip' });
+        console.log('blob', blob);
+        formData.append(key, blob, `${params.parentTaskId}.zip`); // 后端逻辑通过.zip文件名称判断
+      }
+    }
+    let consoleForm = () => {
+      console.log('----formData----');
+      let formObject = {};
+      formData.forEach((value, key) => {
+        formObject[key] = value;
+      });
+      console.log(formObject);
+      /*
                     {
                         "clientId": "",
                         "userId": "",
@@ -64,142 +64,138 @@ export class MusetalkUtils {
                         }
                     }
                 */
-        };
-        consoleForm();
-        let send = async () => {
-            fetch(AppConfig.aiHuman.taskSubmit, {
-                method: "POST",
-                body: formData, // 使用 FormData 替代 JSON
-            })
-                .then(async (res) => {
-                    let d = await res.json();
-                    console.log("submitRenderTask:", d);
-                    // 如果成功 显示成功 打印成功
-                    if (res.ok) {
-                        // response.ok在200~299
-                        /*
+    };
+    consoleForm();
+    let send = async () => {
+      fetch(AppConfig.aiHuman.taskSubmit, {
+        method: 'POST',
+        body: formData, // 使用 FormData 替代 JSON
+      })
+        .then(async res => {
+          let d = await res.json();
+          console.log('submitRenderTask:', d);
+          // 如果成功 显示成功 打印成功
+          if (res.ok) {
+            // response.ok在200~299
+            /*
                             {
                                 "msg": "全部提交成功",
                                 "code": 200
                             }
                         */
-                        Message.success(d.msg);
-                        window.$mapi.log.info(
-                            "submitRenderTask:" + d.msg + d.code
-                        );
-                    } else {
-                        Message.error(d.msg);
-                        window.$mapi.log.error(
-                            "submitRenderTask:" + d.msg + d.code
-                        );
-                    }
-                })
-                .catch((rej) => {
-                    console.error("Network error:", rej);
-                    Message.error("Network error:", rej);
-                    window.$mapi.log.error(
-                        "submitRenderTask Network error:" + rej
-                    );
-                });
-        };
-        send();
-        // 后续可能 根据失败原因处理重新克隆策略
-    }
-    static downloadVideo = async () => {
-        const url =
-            "https://tse2-mm.cn.bing.net/th/id/OIP-C.7GLMYPqMlt2LgkbPsOnDIAAAAA?rs=1&pid=ImgDetMain";
-        const localPath = "downloads/downloaded_image.jpg";
-
-        await window.$mapi.file.download(url, localPath, { progress: null });
-    };
-    // 当status为allFinished  开始下载  我会拿到一个压缩包 里面是一个viedos文件夹 名称和音频一一对应
-    static async getRenderedViews(taskId: string): Promise<any> {
-        return fetch(`${AppConfig.aiHuman.taskDownload}/${taskId}`, {
-            method: "GET",
+            Message.success(d.msg);
+            window.$mapi.log.info('submitRenderTask:' + d.msg + d.code);
+          } else {
+            Message.error(d.msg);
+            window.$mapi.log.error('submitRenderTask:' + d.msg + d.code);
+          }
         })
-            .then(async (res) => {
-                console.log("getRenderedViews:", res); // body是一个ReadableStream 无法json
-                if (res.ok) {
-                    // 一整个的zip
-                    let path = `video/${taskId}/${taskId}.zip`;
-                    let fullPath = await window.$mapi.file.fullPath(path);
-                    const reader = res.body.getReader();
-                    let chunks = [];
-                    let totalLength = 0;
+        .catch(rej => {
+          console.error('Network error:', rej);
+          Message.error('Network error:', rej);
+          window.$mapi.log.error('submitRenderTask Network error:' + rej);
+        });
+    };
+    send();
+    // 后续可能 根据失败原因处理重新克隆策略
+  }
+  static downloadVideo = async () => {
+    const url =
+      'https://tse2-mm.cn.bing.net/th/id/OIP-C.7GLMYPqMlt2LgkbPsOnDIAAAAA?rs=1&pid=ImgDetMain';
+    const localPath = 'downloads/downloaded_image.jpg';
 
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
-                        chunks.push(value);
-                        totalLength += value.length;
-                    }
+    await window.$mapi.file.download(url, localPath, { progress: null });
+  };
+  // 当status为allFinished  开始下载  我会拿到一个压缩包 里面是一个viedos文件夹 名称和音频一一对应
+  static async getRenderedViews(taskId: string): Promise<any> {
+    return fetch(`${AppConfig.aiHuman.taskDownload}/${taskId}`, {
+      method: 'GET',
+    })
+      .then(async res => {
+        console.log('getRenderedViews:', res); // body是一个ReadableStream 无法json
+        if (res.ok) {
+          // 一整个的zip
+          let path = `video/${taskId}/${taskId}.zip`;
+          let fullPath = await window.$mapi.file.fullPath(path);
+          const reader = res.body.getReader();
+          let chunks = [];
+          let totalLength = 0;
 
-                    const buffer = new Uint8Array(totalLength);
-                    let position = 0;
-                    for (const chunk of chunks) {
-                        buffer.set(chunk, position);
-                        position += chunk.length;
-                    }
-                    let unzipPath;
-                    await window.$mapi.file.writeBuffer(fullPath, buffer, {
-                        isFullPath: true,
-                    }).then(async ()=>{
-                        unzipPath = await window.$mapi.file.unzipFolder(fullPath); // 返回视频所在文件夹
-                    });
-                    return unzipPath;
-                }
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+            totalLength += value.length;
+          }
+
+          const buffer = new Uint8Array(totalLength);
+          let position = 0;
+          for (const chunk of chunks) {
+            buffer.set(chunk, position);
+            position += chunk.length;
+          }
+          let unzipPath;
+          await window.$mapi.file
+            .writeBuffer(fullPath, buffer, {
+              isFullPath: true,
             })
-            .catch((rej) => {
-                console.error("Network error:", rej);
-                Message.error("Network error:", rej);
-                window.$mapi.log.error("submitRenderTask Network error:" + rej);
+            .then(async () => {
+              unzipPath = await window.$mapi.file.unzipFolder(fullPath); // 返回视频所在文件夹
             });
-    }
-    // static async mockGetRenderedViews(taskId: string): Promise<void> {
-    //     return new Promise((resolve, reject) => {
-    //         setTimeout(async () => {
-    //             let zipFilePath = String.raw`C:\Users\Alan\AppData\Roaming\aigcpanel\data\audio\taskByRoom`; // 这个路径应该在video下
-    //             zipFilePath = zipFilePath + `\\${taskId}.zip`;
-    //             let unzipPath = await window.$mapi.file.unzipFolder(
-    //                 zipFilePath
-    //             ); // 返回视频所在文件夹
-    //             console.log("unzipPath", unzipPath);
-    //             resolve(unzipPath);
-    //         }, 20);
-    //     });
-    // }
-    static async getTaskStatus(taskId: string): Promise<any> {
-        // return fetch(
-        //     `${AppConfig.aiHuman.taskStatus}/${taskId}`, // 接口是这样 而非query
-        //     {
-        //         method: "GET",
-        //     }
-        // )
-        //     .then(async (res) => await res.json())
-        //     .catch((rej) => {
-        //         console.error("Network error:", rej);
-        //     });
-        if (this.isQuerying) return;
-
-        this.isQuerying = true;
-
-        try {
-            return await fetch(
-                `${AppConfig.aiHuman.taskStatus}/${taskId}`, // 接口是这样 而非query
-                {
-                    method: "GET",
-                }
-            )
-            .then(async (res) => await res.json())
-            .catch((rej) => {
-                console.error("Network error:", rej);
-            });
-        } catch (rej) {
-            console.error("Network error:", rej);
-        } finally {
-            setTimeout(() => {
-                this.isQuerying = false;
-            }, 3000);
+          return unzipPath;
         }
+      })
+      .catch(rej => {
+        console.error('Network error:', rej);
+        Message.error('Network error:', rej);
+        window.$mapi.log.error('submitRenderTask Network error:' + rej);
+      });
+  }
+  // static async mockGetRenderedViews(taskId: string): Promise<void> {
+  //     return new Promise((resolve, reject) => {
+  //         setTimeout(async () => {
+  //             let zipFilePath = String.raw`C:\Users\Alan\AppData\Roaming\aigcpanel\data\audio\taskByRoom`; // 这个路径应该在video下
+  //             zipFilePath = zipFilePath + `\\${taskId}.zip`;
+  //             let unzipPath = await window.$mapi.file.unzipFolder(
+  //                 zipFilePath
+  //             ); // 返回视频所在文件夹
+  //             console.log("unzipPath", unzipPath);
+  //             resolve(unzipPath);
+  //         }, 20);
+  //     });
+  // }
+  static async getTaskStatus(taskId: string): Promise<any> {
+    // return fetch(
+    //     `${AppConfig.aiHuman.taskStatus}/${taskId}`, // 接口是这样 而非query
+    //     {
+    //         method: "GET",
+    //     }
+    // )
+    //     .then(async (res) => await res.json())
+    //     .catch((rej) => {
+    //         console.error("Network error:", rej);
+    //     });
+    if (this.isQuerying) return;
+
+    this.isQuerying = true;
+
+    try {
+      return await fetch(
+        `${AppConfig.aiHuman.taskStatus}/${taskId}`, // 接口是这样 而非query
+        {
+          method: 'GET',
+        }
+      )
+        .then(async res => await res.json())
+        .catch(rej => {
+          console.error('Network error:', rej);
+        });
+    } catch (rej) {
+      console.error('Network error:', rej);
+    } finally {
+      setTimeout(() => {
+        this.isQuerying = false;
+      }, 3000);
     }
+  }
 }

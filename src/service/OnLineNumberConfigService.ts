@@ -39,7 +39,7 @@ class OnLineNumberConfigService {
       data.creator || 'system',
       data.creator || 'system',
       now,
-      data.platform
+      data.platform,
     ]);
 
     return id;
@@ -48,16 +48,16 @@ class OnLineNumberConfigService {
   async update(id: string, data: Partial<OnLineNumberConfigRecord>): Promise<void> {
     const sets: string[] = [];
     const params: any[] = [];
-    
+
     Object.entries(data).forEach(([key, value]) => {
       if (value !== undefined && key !== 'id') {
         sets.push(`${key} = ?`);
         params.push(value);
       }
     });
-    
+
     if (sets.length === 0) return;
-    
+
     sets.push('update_date = ?');
     params.push(new Date().toISOString());
     params.push(id);
@@ -82,4 +82,4 @@ class OnLineNumberConfigService {
   }
 }
 
-export default new OnLineNumberConfigService(); 
+export default new OnLineNumberConfigService();

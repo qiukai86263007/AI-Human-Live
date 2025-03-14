@@ -44,10 +44,10 @@ class HsEngineConfigService {
   async create(config: HsEngineConfig): Promise<string> {
     const id = uuidv4();
     const now = new Date().toISOString();
-    
+
     // 如果没有提供 access_key_id，则使用 access_key_secret 的值
     const access_key_id = config.access_key_id || config.access_key_secret;
-    
+
     const sql = `INSERT INTO ${this.tableName} (
       id, account, app_key, access_key_secret, access_key_id, 
       state, create_date, creator, updater, update_date, 
@@ -55,9 +55,19 @@ class HsEngineConfigService {
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
     await window.$mapi.db.execute(sql, [
-      id, config.account, config.app_key, config.access_key_secret, access_key_id,
-      config.state || 'normal', now, config.creator || 'system', config.updater || 'system', now,
-      config.configType || 1, config.hsKeyid, config.hsAccessKey
+      id,
+      config.account,
+      config.app_key,
+      config.access_key_secret,
+      access_key_id,
+      config.state || 'normal',
+      now,
+      config.creator || 'system',
+      config.updater || 'system',
+      now,
+      config.configType || 1,
+      config.hsKeyid,
+      config.hsAccessKey,
     ]);
 
     return id;
@@ -67,21 +77,21 @@ class HsEngineConfigService {
   async update(id: string, config: Partial<HsEngineConfig>): Promise<void> {
     const sets: string[] = [];
     const params: any[] = [];
-    
+
     // 如果更新了 access_key_secret，同时也更新 access_key_id
     if (config.access_key_secret !== undefined) {
       config.access_key_id = config.access_key_secret;
     }
-    
+
     Object.entries(config).forEach(([key, value]) => {
       if (value !== undefined && key !== 'id') {
         sets.push(`${key} = ?`);
         params.push(value);
       }
     });
-    
+
     if (sets.length === 0) return;
-    
+
     sets.push('update_date = ?');
     params.push(new Date().toISOString());
     params.push(id);
@@ -115,4 +125,4 @@ class HsEngineConfigService {
   }
 }
 
-export default new HsEngineConfigService(); 
+export default new HsEngineConfigService();

@@ -3,7 +3,6 @@ import * as path from 'path';
 import fetch from 'node-fetch';
 import { AppConfig } from '../config';
 
-
 interface AudioData {
   audio_bytes: string;
   audio_format: string;
@@ -18,19 +17,26 @@ interface TrainRequestData {
   model_type: number;
 }
 
-export async function train(appid: string, token: string, audioPath: string, spkId: string): Promise<void> {
+export async function train(
+  appid: string,
+  token: string,
+  audioPath: string,
+  spkId: string
+): Promise<void> {
   const url = `${AppConfig.hsAPIConfig.upload}`;
   const headers = {
-    "Content-Type": "application/json",
-    "Authorization": `Bearer;${token}`,
-    "Resource-Id": "volc.megatts.voiceclone",
+    'Content-Type': 'application/json',
+    Authorization: `Bearer;${token}`,
+    'Resource-Id': 'volc.megatts.voiceclone',
   };
 
   const [encodedData, audioFormat] = await encodeAudioFile(audioPath);
-  const audios: AudioData[] = [{
-    audio_bytes: encodedData,
-    audio_format: audioFormat
-  }];
+  const audios: AudioData[] = [
+    {
+      audio_bytes: encodedData,
+      audio_format: audioFormat,
+    },
+  ];
 
   const data: TrainRequestData = {
     appid,
@@ -38,45 +44,55 @@ export async function train(appid: string, token: string, audioPath: string, spk
     audios,
     source: 2,
     language: 0,
-    model_type: 1
+    model_type: 1,
   };
 
   const response = await fetch(url, {
     method: 'POST',
     headers,
-    body: JSON.stringify(data)
+    body: JSON.stringify(data),
   });
-  await window.$mapi.log.error('Header: ' +  JSON.stringify(headers)+', Body: '+ data.appid+' , '+data.speaker_id);
-  console.log("status code = ", response.status);
-  
+  await window.$mapi.log.error(
+    'Header: ' + JSON.stringify(headers) + ', Body: ' + data.appid + ' , ' + data.speaker_id
+  );
+  console.log('status code = ', response.status);
+
   if (response.status !== 200) {
-    await window.$mapi.log.error('请求火山引擎训练接口错误:,错误码' +  response.status+', 错误信息:'+ await response.text());
+    await window.$mapi.log.error(
+      '请求火山引擎训练接口错误:,错误码' + response.status + ', 错误信息:' + (await response.text())
+    );
     throw new Error('请求火山引擎训练接口错误');
   }
-  await window.$mapi.log.info('请求火山引擎训练接口成功，返回结果:' + JSON.stringify(response.json()));
-  await window.$mapi.log.info("headers = ", JSON.stringify(response.headers));
+  await window.$mapi.log.info(
+    '请求火山引擎训练接口成功，返回结果:' + JSON.stringify(response.json())
+  );
+  await window.$mapi.log.info('headers = ', JSON.stringify(response.headers));
 }
 
 export async function getStatus(appid: string, token: string, spkId: string): Promise<string> {
   const url = `${AppConfig.hsAPIConfig.status}`;
   const headers = {
-    "Content-Type": "application/json",
-    "Authorization": `Bearer;${token}`,
-    "Resource-Id": "volc.megatts.voiceclone",
+    'Content-Type': 'application/json',
+    Authorization: `Bearer;${token}`,
+    'Resource-Id': 'volc.megatts.voiceclone',
   };
 
   const body = {
     appid,
-    speaker_id: spkId
+    speaker_id: spkId,
   };
-  await window.$mapi.log.info('Header: ' +  JSON.stringify(headers)+', Body: '+ JSON.stringify(body));
+  await window.$mapi.log.info(
+    'Header: ' + JSON.stringify(headers) + ', Body: ' + JSON.stringify(body)
+  );
   const response = await fetch(url, {
     method: 'POST',
     headers,
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
   });
   if (response.status !== 200) {
-    await window.$mapi.log.error('请求火山引擎状态接口错误:,错误码' +  response.status+', 错误信息:'+ await response.text());
+    await window.$mapi.log.error(
+      '请求火山引擎状态接口错误:,错误码' + response.status + ', 错误信息:' + (await response.text())
+    );
     throw new Error('请求火山引擎状态接口失败');
   }
   const statusData = JSON.stringify(await response.json());
@@ -96,4 +112,4 @@ async function encodeAudioFile(filePath: string): Promise<[string, string]> {
 // const token = "填入access token";
 // const spkId = "填入声音ID";
 // await train(appid, token, "填入音频路径", spkId);
-// await getStatus(appid, token, spkId); 
+// await getStatus(appid, token, spkId);

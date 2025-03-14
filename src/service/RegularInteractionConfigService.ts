@@ -59,7 +59,7 @@ class RegularInteractionConfigService {
       data.creator || 'system',
       data.creator || 'system',
       now,
-      data.platform
+      data.platform,
     ]);
 
     return id;
@@ -68,16 +68,16 @@ class RegularInteractionConfigService {
   async update(id: string, data: Partial<RegularInteractionConfigRecord>): Promise<void> {
     const sets: string[] = [];
     const params: any[] = [];
-    
+
     Object.entries(data).forEach(([key, value]) => {
       if (value !== undefined && key !== 'id') {
         sets.push(`${key} = ?`);
         params.push(value);
       }
     });
-    
+
     if (sets.length === 0) return;
-    
+
     sets.push('update_date = ?');
     params.push(new Date().toISOString());
     params.push(id);
@@ -102,4 +102,4 @@ class RegularInteractionConfigService {
   }
 }
 
-export default new RegularInteractionConfigService(); 
+export default new RegularInteractionConfigService();

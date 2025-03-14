@@ -1,54 +1,54 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import LiveBroadcastService from '../../service/LiveBroadcastService';
-import { useRouter } from 'vue-router';
-import { v4 as uuidv4 } from 'uuid';
+  import { ref } from 'vue';
+  import LiveBroadcastService from '../../service/LiveBroadcastService';
+  import { useRouter } from 'vue-router';
+  import { v4 as uuidv4 } from 'uuid';
 
-const visible = ref(false);
-const form = ref({
-  name: '',
-  introduction: ''
-});
-
-const router = useRouter();
-
-const show = () => {
-  visible.value = true;
-  form.value = {
+  const visible = ref(false);
+  const form = ref({
     name: '',
-    introduction: ''
+    introduction: '',
+  });
+
+  const router = useRouter();
+
+  const show = () => {
+    visible.value = true;
+    form.value = {
+      name: '',
+      introduction: '',
+    };
   };
-};
 
-const handleSubmit = async () => {
-  try {
-    let id = uuidv4();
-    // 创建直播间记录
-    await LiveBroadcastService.create({
-      id,
-      live_name: form.value.name,
-      live_introduction: form.value.introduction,
-      creator: 'current_user',  // 这里需要替换为实际的用户ID
-      updater: 'current_user',
-      video_duration: '0',
-      audio_live_on: 0
-    });
-    // 关闭对话框
-    visible.value = false;
+  const handleSubmit = async () => {
+    try {
+      let id = uuidv4();
+      // 创建直播间记录
+      await LiveBroadcastService.create({
+        id,
+        live_name: form.value.name,
+        live_introduction: form.value.introduction,
+        creator: 'current_user', // 这里需要替换为实际的用户ID
+        updater: 'current_user',
+        video_duration: '0',
+        audio_live_on: 0,
+      });
+      // 关闭对话框
+      visible.value = false;
 
-    // 跳转到直播间编辑页面
-    router.push({
-      path: 'live-room/edit',
-      query: { id }   // 此处早期返回自增主键致使roomId通过此query读取时错误
-    });
-  } catch (error) {
-    console.error(error);
-  }
-};
+      // 跳转到直播间编辑页面
+      router.push({
+        path: 'live-room/edit',
+        query: { id }, // 此处早期返回自增主键致使roomId通过此query读取时错误
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
-defineExpose({
-  show
-});
+  defineExpose({
+    show,
+  });
 </script>
 
 <template>
@@ -69,11 +69,7 @@ defineExpose({
       <a-form :model="form" class="mb-6" :style="{ width: '100%' }">
         <div class="mb-4">
           <div class="text-sm mb-1">直播间名称</div>
-          <a-input
-            v-model="form.name"
-            placeholder="给直播间起个好听的名字吧"
-            allow-clear
-          />
+          <a-input v-model="form.name" placeholder="给直播间起个好听的名字吧" allow-clear />
         </div>
         <div class="mb-4">
           <div class="text-sm mb-1">直播间简介</div>
@@ -101,7 +97,7 @@ defineExpose({
 </template>
 
 <style scoped>
-.create-live-room-modal :deep(.arco-modal-content) {
-  padding: 24px;
-}
+  .create-live-room-modal :deep(.arco-modal-content) {
+    padding: 24px;
+  }
 </style>

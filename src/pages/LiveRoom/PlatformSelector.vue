@@ -7,17 +7,19 @@
     :width="800"
   >
     <div class="grid grid-cols-4 gap-4">
-      <div v-for="platform in platforms" 
-           :key="platform.id"
-           class="aspect-[2/1] rounded-lg overflow-hidden cursor-pointer transition-transform hover:scale-105"
-           :class="`bg-gradient-to-r ${getPlatformGradient(platform.code)}`"
-           @click="handleSelect(platform)"
+      <div
+        v-for="platform in platforms"
+        :key="platform.id"
+        class="aspect-[2/1] rounded-lg overflow-hidden cursor-pointer transition-transform hover:scale-105"
+        :class="`bg-gradient-to-r ${getPlatformGradient(platform.code)}`"
+        @click="handleSelect(platform)"
       >
         <div class="h-full flex items-center justify-center text-white">
           <div class="text-center mt-2">
-            <img :src="`/platform-icons/${platform.icon}.jpeg`" 
-                 :alt="platform.name"
-                 class="w-16 h-16 mx-auto object-cover"
+            <img
+              :src="`/platform-icons/${platform.icon}.jpeg`"
+              :alt="platform.name"
+              class="w-16 h-16 mx-auto object-cover"
             />
             <div class="text-base font-medium">{{ platform.name }}</div>
           </div>
@@ -28,58 +30,58 @@
 </template>
 
 <script setup lang="ts">
-import { defineProps, defineEmits, computed } from 'vue';
+  import { defineProps, defineEmits, computed } from 'vue';
 
-interface Platform {
-  id: number;
-  name: string;
-  icon: string;
-  code: string;
-}
+  interface Platform {
+    id: number;
+    name: string;
+    icon: string;
+    code: string;
+  }
 
-const props = defineProps<{
-  visible: boolean;
-}>();
+  const props = defineProps<{
+    visible: boolean;
+  }>();
 
-const emit = defineEmits<{
-  (e: 'update:visible', value: boolean): void;
-  (e: 'select', platform: Platform): void;
-}>();
+  const emit = defineEmits<{
+    (e: 'update:visible', value: boolean): void;
+    (e: 'select', platform: Platform): void;
+  }>();
 
-// 使用计算属性处理 v-model
-const modalVisible = computed({
-  get: () => props.visible,
-  set: (value) => emit('update:visible', value)
-});
+  // 使用计算属性处理 v-model
+  const modalVisible = computed({
+    get: () => props.visible,
+    set: value => emit('update:visible', value),
+  });
 
-// 直播平台列表
-const platforms = [
-  { id: 1, name: '抖音', icon: 'douyin', code: 'douyin' },
-  { id: 2, name: '视频号', icon: 'channels', code: 'channels' },
-  { id: 3, name: '快手', icon: 'kuaishou', code: 'kuaishou' },
-  { id: 4, name: '淘宝', icon: 'taobao', code: 'taobao' },
-  { id: 5, name: '美团', icon: 'meituan', code: 'meituan' },
-  { id: 6, name: '拼多多', icon: 'pdd', code: 'pdd' },
-];
+  // 直播平台列表
+  const platforms = [
+    { id: 1, name: '抖音', icon: 'douyin', code: 'douyin' },
+    { id: 2, name: '视频号', icon: 'channels', code: 'channels' },
+    { id: 3, name: '快手', icon: 'kuaishou', code: 'kuaishou' },
+    { id: 4, name: '淘宝', icon: 'taobao', code: 'taobao' },
+    { id: 5, name: '美团', icon: 'meituan', code: 'meituan' },
+    { id: 6, name: '拼多多', icon: 'pdd', code: 'pdd' },
+  ];
 
-// 获取平台卡片的渐变背景
-const getPlatformGradient = (code: string) => {
-  const gradients = {
-    douyin: 'from-[#FE2C55] to-[#000000]',
-    channels: 'from-[#07C160] to-[#045D3F]',
-    kuaishou: 'from-[#FE6D2D] to-[#B94B1E]',
-    alibaba: 'from-[#FF6A00] to-[#B94B1E]',
-    tiktok: 'from-[#FE2C55] to-[#000000]',
-    taobao: 'from-[#FF4400] to-[#B93200]',
-    meituan: 'from-[#FFD100] to-[#B99A00]',
-    pdd: 'from-[#E22E1F] to-[#A31E15]'
+  // 获取平台卡片的渐变背景
+  const getPlatformGradient = (code: string) => {
+    const gradients = {
+      douyin: 'from-[#FE2C55] to-[#000000]',
+      channels: 'from-[#07C160] to-[#045D3F]',
+      kuaishou: 'from-[#FE6D2D] to-[#B94B1E]',
+      alibaba: 'from-[#FF6A00] to-[#B94B1E]',
+      tiktok: 'from-[#FE2C55] to-[#000000]',
+      taobao: 'from-[#FF4400] to-[#B93200]',
+      meituan: 'from-[#FFD100] to-[#B99A00]',
+      pdd: 'from-[#E22E1F] to-[#A31E15]',
+    };
+    return gradients[code] || 'from-gray-500 to-gray-700';
   };
-  return gradients[code] || 'from-gray-500 to-gray-700';
-};
 
-// 处理平台选择
-const handleSelect = (platform: Platform) => {
-  emit('select', platform);
-  emit('update:visible', false);
-};
-</script> 
+  // 处理平台选择
+  const handleSelect = (platform: Platform) => {
+    emit('select', platform);
+    emit('update:visible', false);
+  };
+</script>
